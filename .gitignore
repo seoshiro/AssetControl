@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.screenshot-tools/
+.env
+*.log
+.DS_Store
+~$*

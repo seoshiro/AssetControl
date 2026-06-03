@@ -1,0 +1,291 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  INVENTORY_MANAGER
+  EMPLOYEE
+  AUDITOR
+  VIEWER
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  REPAIR
+  RESERVED
+  WRITTEN_OFF
+  LOST
+}
+
+enum IssuanceStatus {
+  ACTIVE
+  RETURNED
+  OVERDUE
+}
+
+enum RepairStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum RepairPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InventoryCheckStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum InventoryItemStatus {
+  FOUND
+  MISSING
+  MOVED
+  DAMAGED
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  email        String?   @unique
+  passwordHash String    @map("password_hash")
+  role         Role      @default(EMPLOYEE)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  issuedItems      Issuance[]        @relation("IssuedBy")
+  repairCreated    RepairTicket[]    @relation("RepairCreatedBy")
+  repairAssigned   RepairTicket[]    @relation("RepairAssignedTo")
+  inventoryChecks  InventoryCheck[]
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+  attachments      Attachment[]
+
+  @@map("users")
+}
+
+model Category {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
+  description String?
+  equipment   Equipment[]
+
+  @@map("categories")
+}
+
+model Department {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique
+  description String?
+  employees   Employee[]
+
+  @@map("departments")
+}
+
+model Location {
+  id          Int                  @id @default(autoincrement())
+  name        String
+  room        String?
+  floor       String?
+  description String?
+  equipment   Equipment[]
+  expectedIn  InventoryCheckItem[] @relation("ExpectedLocation")
+  actualIn    InventoryCheckItem[] @relation("ActualLocation")
+
+  @@unique([name, room])
+  @@map("locations")
+}
+
+model Employee {
+  id           Int       @id @default(autoincrement())
+  fullName     String    @map("full_name")
+  departmentId Int       @map("department_id")
+  position     String
+  email        String?
+  phone        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  department Department @relation(fields: [departmentId], references: [id])
+  equipment  Equipment[]
+  issuances  Issuance[]
+
+  @@map("employees")
+}
+
+model Equipment {
+  id              Int             @id @default(autoincrement())
+  name            String
+  inventoryNumber String          @unique @map("inventory_number")
+  serialNumber    String?         @map("serial_number")
+  categoryId      Int             @map("category_id")
+  status          EquipmentStatus @default(AVAILABLE)
+  purchaseDate    DateTime        @map("purchase_date")
+  purchasePrice   Decimal?        @db.Decimal(12, 2) @map("purchase_price")
+  warrantyUntil   DateTime?       @map("warranty_until")
+  locationId      Int?            @map("location_id")
+  currentHolderId Int?            @map("current_holder_id")
+  description     String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  category       Category             @relation(fields: [categoryId], references: [id])
+  location       Location?            @relation(fields: [locationId], references: [id])
+  currentHolder  Employee?            @relation(fields: [currentHolderId], references: [id])
+  issuances      Issuance[]
+  repairs        RepairTicket[]
+  inventoryItems InventoryCheckItem[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([locationId])
+  @@map("equipment")
+}
+
+model Issuance {
+  id               Int            @id @default(autoincrement())
+  equipmentId      Int            @map("equipment_id")
+  employeeId       Int            @map("employee_id")
+  issuedById       Int?           @map("issued_by_id")
+  issuedAt         DateTime       @default(now()) @map("issued_at")
+  expectedReturnAt DateTime?      @map("expected_return_at")
+  returnedAt       DateTime?      @map("returned_at")
+  returnComment    String?        @map("return_comment")
+  status           IssuanceStatus @default(ACTIVE)
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+  employee  Employee  @relation(fields: [employeeId], references: [id])
+  issuedBy  User?     @relation("IssuedBy", fields: [issuedById], references: [id])
+
+  @@index([status])
+  @@index([employeeId])
+  @@index([equipmentId])
+  @@map("issuances")
+}
+
+model RepairTicket {
+  id           Int            @id @default(autoincrement())
+  equipmentId  Int            @map("equipment_id")
+  createdById  Int?           @map("created_by_id")
+  assignedToId Int?           @map("assigned_to_id")
+  status       RepairStatus   @default(OPEN)
+  priority     RepairPriority @default(MEDIUM)
+  reason       String
+  diagnosis    String?
+  result       String?
+  cost         Decimal?       @db.Decimal(12, 2)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  completedAt  DateTime?      @map("completed_at")
+
+  equipment  Equipment @relation(fields: [equipmentId], references: [id])
+  createdBy  User?     @relation("RepairCreatedBy", fields: [createdById], references: [id])
+  assignedTo User?     @relation("RepairAssignedTo", fields: [assignedToId], references: [id])
+
+  @@index([status])
+  @@index([priority])
+  @@map("repair_tickets")
+}
+
+model InventoryCheck {
+  id            Int                  @id @default(autoincrement())
+  title         String
+  status        InventoryCheckStatus @default(PLANNED)
+  startedAt     DateTime             @default(now()) @map("started_at")
+  completedAt   DateTime?            @map("completed_at")
+  createdById   Int?                 @map("created_by_id")
+
+  createdBy User?                @relation(fields: [createdById], references: [id])
+  items     InventoryCheckItem[]
+
+  @@map("inventory_checks")
+}
+
+model InventoryCheckItem {
+  id                Int                 @id @default(autoincrement())
+  inventoryCheckId  Int                 @map("inventory_check_id")
+  equipmentId       Int                 @map("equipment_id")
+  expectedLocationId Int?               @map("expected_location_id")
+  actualLocationId   Int?               @map("actual_location_id")
+  status            InventoryItemStatus @default(FOUND)
+  comment           String?
+
+  inventoryCheck  InventoryCheck @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
+  equipment       Equipment      @relation(fields: [equipmentId], references: [id])
+  expectedLocation Location?     @relation("ExpectedLocation", fields: [expectedLocationId], references: [id])
+  actualLocation   Location?     @relation("ActualLocation", fields: [actualLocationId], references: [id])
+
+  @@unique([inventoryCheckId, equipmentId])
+  @@map("inventory_check_items")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?     @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int              @map("user_id")
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model Attachment {
+  id           Int      @id @default(autoincrement())
+  entityType   String   @map("entity_type")
+  entityId     String   @map("entity_id")
+  fileName     String   @map("file_name")
+  filePath     String   @map("file_path")
+  mimeType     String   @map("mime_type")
+  size         Int
+  uploadedById Int?     @map("uploaded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("attachments")
+}

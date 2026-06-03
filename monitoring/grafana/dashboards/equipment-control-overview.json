@@ -1,0 +1,238 @@
+{
+  "uid": "equipment-control-overview",
+  "title": "Equipment Control — System Overview",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "15s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "tags": ["equipment-control", "prometheus", "diploma"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Backend DB status",
+      "description": "Database connectivity from backend. 1 means UP, 0 means DOWN.",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_db_up{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "db" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Backend uptime",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "(time() - sum(process_start_time_seconds{job=\"equipment-backend\"})) or vector(0)", "legendFormat": "uptime" }],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "area", "justifyMode": "center" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "API requests, 5m",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(increase(http_requests_total{job=\"equipment-backend\"}[5m])) or vector(0)", "legendFormat": "requests" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "area", "justifyMode": "center" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "API errors, 5m",
+      "description": "4xx and 5xx responses in the last 5 minutes. Shows 0 instead of No data.",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(increase(http_requests_total{job=\"equipment-backend\",status_code=~\"4..|5..\"}[5m])) or vector(0)", "legendFormat": "errors" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Equipment total",
+      "gridPos": { "x": 0, "y": 4, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "assets" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Employees",
+      "gridPos": { "x": 4, "y": 4, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(employees_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "employees" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Active issuances",
+      "gridPos": { "x": 8, "y": 4, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(active_issuances_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "active" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Overdue issuances",
+      "gridPos": { "x": 12, "y": 4, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(overdue_issuances_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "overdue" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Open repairs",
+      "gridPos": { "x": 16, "y": 4, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(repair_tickets_by_status{job=\"equipment-backend\",status=~\"OPEN|IN_PROGRESS\"}) or vector(0)", "legendFormat": "open repairs" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 2 }, { "color": "red", "value": 6 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Inventory checks",
+      "gridPos": { "x": 20, "y": 4, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(inventory_checks_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "checks" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 11,
+      "type": "piechart",
+      "title": "Equipment by status",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "equipment_by_status{job=\"equipment-backend\"}", "legendFormat": "{{status}}" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "displayLabels": ["name", "value"], "legend": { "displayMode": "list", "placement": "right", "showLegend": true }, "pieType": "donut", "reduceOptions": { "calcs": ["lastNotNull"], "values": false } }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Equipment availability ratio",
+      "gridPos": { "x": 8, "y": 8, "w": 4, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "(100 * sum(equipment_by_status{job=\"equipment-backend\",status=\"AVAILABLE\"}) / clamp_min(sum(equipment_total{job=\"equipment-backend\"}), 1)) or vector(0)", "legendFormat": "available" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 25 }, { "color": "green", "value": 50 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Available equipment",
+      "gridPos": { "x": 12, "y": 8, "w": 3, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_by_status{job=\"equipment-backend\",status=\"AVAILABLE\"}) or vector(0)", "legendFormat": "available" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "In use equipment",
+      "gridPos": { "x": 15, "y": 8, "w": 3, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_by_status{job=\"equipment-backend\",status=\"IN_USE\"}) or vector(0)", "legendFormat": "in use" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "In repair equipment",
+      "gridPos": { "x": 18, "y": 8, "w": 3, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_by_status{job=\"equipment-backend\",status=\"REPAIR\"}) or vector(0)", "legendFormat": "repair" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Written off / lost",
+      "gridPos": { "x": 21, "y": 8, "w": 3, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_by_status{job=\"equipment-backend\",status=~\"WRITTEN_OFF|LOST\"}) or vector(0)", "legendFormat": "inactive assets" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 4 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 17,
+      "type": "bargauge",
+      "title": "Repair tickets by status",
+      "gridPos": { "x": 0, "y": 15, "w": 6, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "repair_tickets_by_status{job=\"equipment-backend\"}", "legendFormat": "{{status}}" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 2 }, { "color": "red", "value": 5 }] } }, "overrides": [] },
+      "options": { "displayMode": "lcd", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "values": false } }
+    },
+    {
+      "id": 18,
+      "type": "bargauge",
+      "title": "Inventory checks by status",
+      "gridPos": { "x": 6, "y": 15, "w": 6, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "inventory_checks_by_status{job=\"equipment-backend\"}", "legendFormat": "{{status}}" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "displayMode": "lcd", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "values": false } }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Audit records",
+      "gridPos": { "x": 12, "y": 15, "w": 3, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(audit_logs_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "audit logs" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "area", "justifyMode": "center" }
+    },
+    {
+      "id": 20,
+      "type": "bargauge",
+      "title": "HTTP status codes, 5m",
+      "gridPos": { "x": 15, "y": 15, "w": 4, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (status_code) (increase(http_requests_total{job=\"equipment-backend\"}[5m])) or on() label_replace(vector(0), \"status_code\", \"no traffic\", \"\", \"\")", "legendFormat": "{{status_code}}" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 10 }] } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "values": false } }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Requests per second by route",
+      "gridPos": { "x": 19, "y": 15, "w": 5, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (method, route) (rate(http_requests_total{job=\"equipment-backend\"}[1m])) or on() label_replace(label_replace(vector(0), \"method\", \"GET\", \"\", \"\"), \"route\", \"no traffic yet\", \"\", \"\")", "legendFormat": "{{method}} {{route}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 1, "fillOpacity": 8, "showPoints": "never" } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    }
+  ]
+}

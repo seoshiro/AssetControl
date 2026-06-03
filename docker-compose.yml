@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: equipment_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-equipment_db}
+    ports:
+      - "9173:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: equipment_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-equipment_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-dev_only_change_me_for_demo}
+      PORT: 5847
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:6347,http://127.0.0.1:6347}
+    ports:
+      - "5847:5847"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    container_name: equipment_frontend
+    restart: unless-stopped
+    ports:
+      - "6347:80"
+    depends_on:
+      - backend
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: equipment_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-password123}
+    ports:
+      - "8571:80"
+    depends_on:
+      - postgres
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: equipment_prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "4747:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: equipment_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "5240:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  pgdata:
+  grafana_data:
