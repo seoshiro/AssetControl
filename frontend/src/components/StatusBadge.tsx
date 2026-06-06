@@ -63,6 +63,54 @@ export const statusConfig: Record<string, { label: string; classes: string }> = 
     label: 'Завершено',
     classes: 'status-success',
   },
+  NORMAL: {
+    label: 'Норма',
+    classes: 'status-success',
+  },
+  DEPRECIATED: {
+    label: 'Высокий износ',
+    classes: 'status-warning',
+  },
+  EXPENSIVE_MAINTENANCE: {
+    label: 'Дорогой сервис',
+    classes: 'status-danger',
+  },
+  PENDING: {
+    label: 'Ожидает',
+    classes: 'status-muted',
+  },
+  NOTIFIED: {
+    label: 'Назначено',
+    classes: 'status-info',
+  },
+  PICKED_UP: {
+    label: 'Забрано',
+    classes: 'status-warning',
+  },
+  DELIVERED: {
+    label: 'Доставлено',
+    classes: 'status-success',
+  },
+  PURCHASE: {
+    label: 'Покупка',
+    classes: 'status-info',
+  },
+  SERVICE: {
+    label: 'Сервис',
+    classes: 'status-warning',
+  },
+  RENT: {
+    label: 'Аренда',
+    classes: 'status-muted',
+  },
+  COMPENSATION: {
+    label: 'Компенсация',
+    classes: 'status-danger',
+  },
+  OTHER: {
+    label: 'Прочее',
+    classes: 'status-muted',
+  },
 };
 
 export function getStatusLabel(status: string) {

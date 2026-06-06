@@ -18,6 +18,10 @@ interface AuthContextType {
   canManageInventory: boolean;
   canViewReports: boolean;
   canAudit: boolean;
+  canManageFinance: boolean;
+  canViewFinance: boolean;
+  canViewRepairPickup: boolean;
+  isRepairCoordinator: boolean;
   isLoading: boolean;
 }
 
@@ -76,6 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canManageInventory: ['ADMIN', 'MANAGER', 'INVENTORY_MANAGER'].includes(user?.role || ''),
         canViewReports: ['ADMIN', 'MANAGER', 'INVENTORY_MANAGER', 'AUDITOR', 'VIEWER'].includes(user?.role || ''),
         canAudit: ['ADMIN', 'AUDITOR'].includes(user?.role || ''),
+        canManageFinance: ['ADMIN', 'MANAGER'].includes(user?.role || ''),
+        canViewFinance: ['ADMIN', 'MANAGER', 'INVENTORY_MANAGER', 'AUDITOR', 'VIEWER'].includes(user?.role || ''),
+        canViewRepairPickup: ['ADMIN', 'MANAGER', 'INVENTORY_MANAGER', 'REPAIR_COORDINATOR', 'AUDITOR'].includes(user?.role || ''),
+        isRepairCoordinator: user?.role === 'REPAIR_COORDINATOR',
         isLoading,
       }}
     >

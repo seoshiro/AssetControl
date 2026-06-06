@@ -87,6 +87,7 @@ export function RoleBadge({ role }: { role?: string | null }) {
     ADMIN: 'ADMIN',
     MANAGER: 'MANAGER',
     INVENTORY_MANAGER: 'INVENTORY',
+    REPAIR_COORDINATOR: 'REPAIR',
     EMPLOYEE: 'EMPLOYEE',
     AUDITOR: 'AUDITOR',
     VIEWER: 'VIEWER',

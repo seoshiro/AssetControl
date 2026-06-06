@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ContentCard, PageContainer, PageHeader, TablePanel } from '../components/PageLayout';
-import { EmptyState, SearchInput } from '../components/ui';
+import { EmptyState, ErrorState, SearchInput } from '../components/ui';
 
 interface Employee {
   id: number;
@@ -17,6 +17,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
   const { canManage } = useAuth();
   const navigate = useNavigate();
 
@@ -35,10 +36,11 @@ export default function EmployeesPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Удалить сотрудника?')) return;
     try {
+      setError('');
       await api.delete(`/employees/${id}`);
       fetchEmployees();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Ошибка удаления');
+      setError(err.response?.data?.error || 'Ошибка удаления');
     }
   };
 
@@ -69,6 +71,8 @@ export default function EmployeesPage() {
           </Link>
         )}
       />
+
+      {error && <ErrorState message={error} />}
 
       <ContentCard className="max-w-2xl">
         <SearchInput placeholder="Поиск по ФИО, отделу, должности..." value={search} onChange={setSearch} />

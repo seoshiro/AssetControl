@@ -11,6 +11,7 @@ export default function BackupPage() {
 
   const handleDownload = async () => {
     try {
+      setError('');
       const response = await api.get('/backup/download', {
         responseType: 'blob',
       });
@@ -22,7 +23,7 @@ export default function BackupPage() {
       link.click();
       link.parentNode?.removeChild(link);
     } catch (err) {
-      alert('Ошибка при скачивании бэкапа');
+      setError('Ошибка при скачивании бэкапа');
     }
   };
 

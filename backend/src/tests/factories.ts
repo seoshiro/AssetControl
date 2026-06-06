@@ -1,5 +1,6 @@
 import {
   EquipmentStatus,
+  FinancialStatus,
   InventoryCheckStatus,
   InventoryItemStatus,
   IssuanceStatus,
@@ -44,6 +45,11 @@ export function buildEquipment(overrides: Record<string, unknown> = {}) {
     status: EquipmentStatus.AVAILABLE,
     purchaseDate: new Date('2026-01-10'),
     purchasePrice: 420000,
+    currentValue: 300000,
+    depreciationPercent: 29,
+    residualValue: 300000,
+    serviceCostTotal: 15000,
+    financialStatus: FinancialStatus.NORMAL,
     warrantyUntil: new Date('2027-01-10'),
     categoryId: 1,
     locationId: 1,

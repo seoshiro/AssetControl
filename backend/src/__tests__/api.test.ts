@@ -2,7 +2,19 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import bcrypt from 'bcryptjs';
-import { EquipmentStatus, InventoryCheckStatus, InventoryItemStatus, IssuanceStatus, RepairPriority, RepairStatus, Role } from '@prisma/client';
+import {
+  EquipmentStatus,
+  FinancialStatus,
+  InventoryCheckStatus,
+  InventoryItemStatus,
+  IssuanceStatus,
+  PaymentMethod,
+  PaymentType,
+  RepairPickupStatus,
+  RepairPriority,
+  RepairStatus,
+  Role,
+} from '@prisma/client';
 import { config } from '../config';
 import { createApp } from '../app';
 import {
@@ -21,6 +33,7 @@ const prismaMock = vi.hoisted(() => ({
   auditLog: { create: vi.fn(), findMany: vi.fn() },
   notification: { createMany: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   equipment: { count: vi.fn(), groupBy: vi.fn(), aggregate: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  equipmentFinancialOperation: { aggregate: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   category: { findMany: vi.fn(), upsert: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   department: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   location: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -51,6 +64,11 @@ const sampleEquipment = {
   status: EquipmentStatus.AVAILABLE,
   purchaseDate: new Date('2026-01-10'),
   purchasePrice: 420000,
+  currentValue: 300000,
+  depreciationPercent: 29,
+  residualValue: 300000,
+  serviceCostTotal: 15000,
+  financialStatus: FinancialStatus.NORMAL,
   warrantyUntil: new Date('2027-01-10'),
   category: { name: 'Ноутбуки' },
   location: { name: 'Склад' },
@@ -118,7 +136,7 @@ describe('equipment control API', () => {
   it('returns dashboard stats structure', async () => {
     prismaMock.equipment.count.mockResolvedValue(10);
     prismaMock.equipment.groupBy.mockResolvedValueOnce([{ status: 'AVAILABLE', _count: { id: 4 } }]).mockResolvedValueOnce([{ categoryId: 1, _count: { id: 10 } }]);
-    prismaMock.equipment.aggregate.mockResolvedValue({ _sum: { purchasePrice: 1000 } });
+    prismaMock.equipment.aggregate.mockResolvedValue({ _sum: { purchasePrice: 1000, residualValue: 700, serviceCostTotal: 120 } });
     prismaMock.category.findMany.mockResolvedValue([{ id: 1, name: 'Ноутбуки' }]);
     prismaMock.issuance.findMany.mockResolvedValue([]);
     prismaMock.issuance.count.mockResolvedValue(0);
@@ -132,6 +150,8 @@ describe('equipment control API', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('statusStats');
     expect(res.body).toHaveProperty('timeline');
+    expect(res.body.residualValue).toBe(700);
+    expect(res.body.repairServiceCost).toBe(120);
   });
 
   it('returns equipment PDF for admin', async () => {
@@ -922,10 +942,146 @@ describe('equipment control API', () => {
     }));
   });
 
+  it('returns finance summary for auditor with calculated totals', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ role: Role.AUDITOR }));
+    prismaMock.equipment.findMany.mockResolvedValue([
+      { ...sampleEquipment, financialStatus: FinancialStatus.EXPENSIVE_MAINTENANCE, depreciationPercent: 65 },
+    ]);
+    prismaMock.equipmentFinancialOperation.aggregate.mockResolvedValue({ _sum: { amount: 25000 } });
+
+    const res = await request(app).get('/api/finance/summary').set('Authorization', `Bearer ${token(Role.AUDITOR)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.totalPurchaseValue).toBe(420000);
+    expect(res.body.repairAndServiceCost).toBe(25000);
+    expect(res.body.highDepreciationCount).toBe(1);
+    expect(res.body.expensiveMaintenanceCount).toBe(1);
+  });
+
+  it('blocks employee from finance module', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ role: Role.EMPLOYEE }));
+
+    const res = await request(app).get('/api/finance/summary').set('Authorization', `Bearer ${token(Role.EMPLOYEE)}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it('hides financial operations from viewer equipment finance details', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ role: Role.VIEWER }));
+    prismaMock.equipment.findUnique.mockResolvedValue(buildEquipment());
+
+    const res = await request(app).get('/api/finance/equipment/1').set('Authorization', `Bearer ${token(Role.VIEWER)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.detailsHidden).toBe(true);
+    expect(res.body.operations).toHaveLength(0);
+    expect(prismaMock.equipmentFinancialOperation.findMany).not.toHaveBeenCalled();
+  });
+
+  it('creates financial operation and refreshes equipment finance fields', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ role: Role.MANAGER }));
+    prismaMock.equipment.findUnique.mockResolvedValue(buildEquipment());
+    prismaMock.equipmentFinancialOperation.create.mockResolvedValue({
+      id: 7,
+      equipmentId: 1,
+      type: PaymentType.REPAIR,
+      method: PaymentMethod.INVOICE,
+      amount: 12000,
+      operationDate: new Date('2026-05-01'),
+      comment: 'Диагностика',
+      createdBy: { username: 'manager' },
+    });
+    prismaMock.equipmentFinancialOperation.findMany.mockResolvedValue([{ amount: 12000 }]);
+    prismaMock.equipment.update.mockResolvedValue(buildEquipment({ serviceCostTotal: 12000 }));
+
+    const res = await request(app)
+      .post('/api/finance/equipment/1/operations')
+      .set('Authorization', `Bearer ${token(Role.MANAGER)}`)
+      .send({ type: PaymentType.REPAIR, method: PaymentMethod.INVOICE, amount: 12000, comment: 'Диагностика' });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.equipmentFinancialOperation.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ equipmentId: 1, amount: 12000, type: PaymentType.REPAIR }),
+    }));
+    expect(prismaMock.equipment.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ serviceCostTotal: 12000 }),
+    }));
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'finance.operation_create' }),
+    }));
+  });
+
+  it('lets repair coordinator list only assigned pickup tasks', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ id: 9, role: Role.REPAIR_COORDINATOR }));
+    prismaMock.repairTicket.findMany.mockResolvedValue([buildRepairTicket({
+      assignedCoordinatorId: 9,
+      pickupStatus: RepairPickupStatus.NOTIFIED,
+      pickupDueDate: new Date('2026-06-01'),
+      assignedCoordinator: { id: 9, username: 'repair_coordinator', role: Role.REPAIR_COORDINATOR },
+    })]);
+
+    const res = await request(app).get('/api/repair-pickups').set('Authorization', `Bearer ${token(Role.REPAIR_COORDINATOR)}`);
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.repairTicket.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { assignedCoordinatorId: 9 },
+    }));
+  });
+
+  it('allows managers to list active repair coordinators', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ role: Role.MANAGER }));
+    prismaMock.user.findMany.mockResolvedValue([{ id: 9, username: 'repair_coordinator', role: Role.REPAIR_COORDINATOR }]);
+
+    const res = await request(app).get('/api/repair-pickups/coordinators').set('Authorization', `Bearer ${token(Role.MANAGER)}`);
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { role: Role.REPAIR_COORDINATOR, isActive: true },
+    }));
+  });
+
+  it('blocks employees from listing repair coordinators', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ role: Role.EMPLOYEE }));
+
+    const res = await request(app).get('/api/repair-pickups/coordinators').set('Authorization', `Bearer ${token(Role.EMPLOYEE)}`);
+
+    expect(res.status).toBe(403);
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('marks pickup as delivered and moves repair to IN_PROGRESS', async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(buildUser({ id: 9, role: Role.REPAIR_COORDINATOR }));
+    prismaMock.repairTicket.findUnique.mockResolvedValue(buildRepairTicket({
+      id: 4,
+      assignedCoordinatorId: 9,
+      pickupStatus: RepairPickupStatus.PICKED_UP,
+      assignedCoordinator: { id: 9, username: 'repair_coordinator', role: Role.REPAIR_COORDINATOR },
+    }));
+    prismaMock.repairTicket.update.mockResolvedValue(buildRepairTicket({
+      id: 4,
+      assignedCoordinatorId: 9,
+      pickupStatus: RepairPickupStatus.DELIVERED,
+      status: RepairStatus.IN_PROGRESS,
+      assignedCoordinator: { id: 9, username: 'repair_coordinator', role: Role.REPAIR_COORDINATOR },
+    }));
+    prismaMock.user.findMany.mockResolvedValue([buildUser({ id: 1, role: Role.ADMIN })]);
+
+    const res = await request(app)
+      .put('/api/repair-pickups/4/status')
+      .set('Authorization', `Bearer ${token(Role.REPAIR_COORDINATOR)}`)
+      .send({ status: RepairPickupStatus.DELIVERED, comment: 'Доставлено' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.repairTicket.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ pickupStatus: RepairPickupStatus.DELIVERED, status: RepairStatus.IN_PROGRESS }),
+    }));
+    expect(prismaMock.notification.createMany).toHaveBeenCalled();
+  });
+
   it('dashboard fills missing statuses with zero values', async () => {
     prismaMock.equipment.count.mockResolvedValue(2);
     prismaMock.equipment.groupBy.mockResolvedValueOnce([{ status: EquipmentStatus.AVAILABLE, _count: { id: 2 } }]).mockResolvedValueOnce([]);
-    prismaMock.equipment.aggregate.mockResolvedValue({ _sum: { purchasePrice: 1000 } });
+    prismaMock.equipment.aggregate.mockResolvedValue({ _sum: { purchasePrice: 1000, residualValue: 600, serviceCostTotal: 50 } });
     prismaMock.category.findMany.mockResolvedValue([]);
     prismaMock.issuance.findMany.mockResolvedValue([]);
     prismaMock.issuance.count.mockResolvedValue(0);
@@ -946,7 +1102,7 @@ describe('equipment control API', () => {
   it('dashboard counts overdue issuances and critical repairs', async () => {
     prismaMock.equipment.count.mockResolvedValue(0);
     prismaMock.equipment.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    prismaMock.equipment.aggregate.mockResolvedValue({ _sum: { purchasePrice: 0 } });
+    prismaMock.equipment.aggregate.mockResolvedValue({ _sum: { purchasePrice: 0, residualValue: 0, serviceCostTotal: 0 } });
     prismaMock.category.findMany.mockResolvedValue([]);
     prismaMock.issuance.findMany.mockResolvedValue([]);
     prismaMock.issuance.count.mockResolvedValue(3);

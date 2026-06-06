@@ -13,6 +13,9 @@ export default function IssuancesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ equipmentId: '', employeeId: '', expectedReturnAt: '' });
   const [error, setError] = useState('');
+  const [returnDialog, setReturnDialog] = useState<any | null>(null);
+  const [returnComment, setReturnComment] = useState('');
+  const [returning, setReturning] = useState(false);
   const { canManage } = useAuth();
 
   const fetchData = async () => {
@@ -45,10 +48,21 @@ export default function IssuancesPage() {
     }
   };
 
-  const returnItem = async (id: number) => {
-    const comment = prompt('Комментарий к возврату') || '';
-    await api.put(`/issuances/${id}/return`, { returnComment: comment });
-    fetchData();
+  const submitReturn = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!returnDialog) return;
+    setReturning(true);
+    setError('');
+    try {
+      await api.put(`/issuances/${returnDialog.id}/return`, { returnComment: returnComment.trim() });
+      setReturnDialog(null);
+      setReturnComment('');
+      await fetchData();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Ошибка возврата');
+    } finally {
+      setReturning(false);
+    }
   };
 
   return (
@@ -91,12 +105,40 @@ export default function IssuancesPage() {
                 <td>{row.expectedReturnAt ? new Date(row.expectedReturnAt).toLocaleDateString('ru-RU') : '—'}</td>
                 <td>{row.returnedAt ? new Date(row.returnedAt).toLocaleDateString('ru-RU') : '—'}</td>
                 <td><StatusBadge status={row.status} /></td>
-                {canManage && <td className="text-right">{!row.returnedAt && <button className="btn-secondary px-3 py-1" onClick={() => returnItem(row.id)}>Вернуть</button>}</td>}
+                {canManage && <td className="text-right">{!row.returnedAt && <button className="btn-secondary px-3 py-1" onClick={() => setReturnDialog(row)}>Вернуть</button>}</td>}
               </tr>
             ))}
           </tbody>
         </table>
       </TablePanel>
+
+      {returnDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/45 p-4">
+          <form onSubmit={submitReturn} className="w-full max-w-lg rounded-lg border border-surface-200 bg-surface-50 p-5 shadow-raised">
+            <p className="section-title">Возврат оборудования</p>
+            <h2 className="mt-2 text-lg font-extrabold text-surface-950">{returnDialog.equipment.name}</h2>
+            <p className="mt-1 text-sm text-surface-500">{returnDialog.employee.fullName}</p>
+
+            <label className="label mt-5" htmlFor="issuance-return-comment">Комментарий к возврату</label>
+            <textarea
+              id="issuance-return-comment"
+              className="input min-h-[112px] resize-y"
+              placeholder="Например: возвращено без повреждений, комплект полный"
+              value={returnComment}
+              onChange={(event) => setReturnComment(event.target.value)}
+            />
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" className="btn-secondary" disabled={returning} onClick={() => { setReturnDialog(null); setReturnComment(''); }}>
+                Отмена
+              </button>
+              <button type="submit" className="btn-primary" disabled={returning}>
+                {returning ? 'Сохранение...' : 'Подтвердить возврат'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </PageContainer>
   );
 }

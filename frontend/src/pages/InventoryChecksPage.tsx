@@ -85,8 +85,8 @@ export default function InventoryChecksPage() {
         </ContentCard>
       )}
 
-      <div className="grid min-h-0 min-w-0 grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <ContentCard className="p-0">
+      <div className="grid min-h-0 min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <ContentCard className="self-start p-0">
           <div className="border-b border-surface-200 px-4 py-3">
             <h2 className="text-sm font-extrabold uppercase text-surface-500">Проверки</h2>
           </div>

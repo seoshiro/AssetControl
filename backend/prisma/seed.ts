@@ -1,10 +1,14 @@
 import {
   EquipmentStatus,
+  FinancialStatus,
   InventoryCheckStatus,
   InventoryItemStatus,
   IssuanceStatus,
   NotificationType,
+  PaymentMethod,
+  PaymentType,
   PrismaClient,
+  RepairPickupStatus,
   RepairPriority,
   RepairStatus,
   Role,
@@ -27,6 +31,7 @@ async function main() {
       inventory_check_items,
       inventory_checks,
       repair_tickets,
+      equipment_financial_operations,
       issuances,
       equipment,
       employees,
@@ -42,11 +47,12 @@ async function main() {
     prisma.user.create({ data: { username: 'admin', email: 'admin@example.local', passwordHash, role: Role.ADMIN } }),
     prisma.user.create({ data: { username: 'manager', email: 'manager@example.local', passwordHash, role: Role.MANAGER } }),
     prisma.user.create({ data: { username: 'inventory_manager', email: 'inventory@example.local', passwordHash, role: Role.INVENTORY_MANAGER } }),
+    prisma.user.create({ data: { username: 'repair_coordinator', email: 'repair-coordinator@example.local', passwordHash, role: Role.REPAIR_COORDINATOR } }),
     prisma.user.create({ data: { username: 'employee', email: 'employee@example.local', passwordHash, role: Role.EMPLOYEE } }),
     prisma.user.create({ data: { username: 'auditor', email: 'auditor@example.local', passwordHash, role: Role.AUDITOR } }),
     prisma.user.create({ data: { username: 'viewer', email: 'viewer@example.local', passwordHash, role: Role.VIEWER } }),
   ]);
-  const [admin, manager, inventoryManager, employeeUser, auditor, viewer] = users;
+  const [admin, manager, inventoryManager, repairCoordinator, employeeUser, auditor, viewer] = users;
 
   const departments = await Promise.all(
     [
@@ -159,6 +165,17 @@ async function main() {
           status: status as EquipmentStatus,
           purchaseDate: daysAgo(120 + index * 7),
           purchasePrice: Number(price),
+          currentValue: Math.round(Number(price) * (index % 9 === 0 ? 0.35 : index % 5 === 0 ? 0.58 : 0.78)),
+          depreciationPercent: index % 9 === 0 ? 65 : index % 5 === 0 ? 42 : 22,
+          residualValue: Math.round(Number(price) * (index % 9 === 0 ? 0.35 : index % 5 === 0 ? 0.58 : 0.78)),
+          serviceCostTotal: index % 7 === 0 ? Math.round(Number(price) * 0.28) : index % 11 === 0 ? Math.round(Number(price) * 0.42) : 0,
+          financialStatus: status === EquipmentStatus.WRITTEN_OFF
+            ? FinancialStatus.WRITTEN_OFF
+            : index % 11 === 0
+              ? FinancialStatus.EXPENSIVE_MAINTENANCE
+              : index % 9 === 0
+                ? FinancialStatus.DEPRECIATED
+                : FinancialStatus.NORMAL,
           warrantyUntil: daysFromNow(180 + index * 5),
           locationId: locationByName[String(locationName)]?.id,
           currentHolderId: holderIndex === null ? null : employees[Number(holderIndex)].id,
@@ -167,6 +184,19 @@ async function main() {
       })
     )
   );
+
+  await prisma.equipmentFinancialOperation.createMany({
+    data: [
+      { equipmentId: equipment[0].id, type: PaymentType.PURCHASE, method: PaymentMethod.INVOICE, amount: 420000, operationDate: daysAgo(155), comment: 'Первичная покупка ноутбука', createdById: manager.id },
+      { equipmentId: equipment[3].id, type: PaymentType.REPAIR, method: PaymentMethod.BANK_TRANSFER, amount: 45000, operationDate: daysAgo(6), comment: 'Диагностика и замена аккумулятора', createdById: manager.id },
+      { equipmentId: equipment[10].id, type: PaymentType.REPAIR, method: PaymentMethod.INVOICE, amount: 68000, operationDate: daysAgo(2), comment: 'Ремонт узла печати', createdById: admin.id },
+      { equipmentId: equipment[18].id, type: PaymentType.SERVICE, method: PaymentMethod.BANK_TRANSFER, amount: 82000, operationDate: daysAgo(9), comment: 'Замена батарейного блока ИБП', createdById: admin.id },
+      { equipmentId: equipment[16].id, type: PaymentType.SERVICE, method: PaymentMethod.INTERNAL_ACCOUNT, amount: 185000, operationDate: daysAgo(22), comment: 'Плановое обслуживание сервера', createdById: manager.id },
+      { equipmentId: equipment[4].id, type: PaymentType.COMPENSATION, method: PaymentMethod.CASH, amount: 75000, operationDate: daysAgo(12), comment: 'Компенсация за потерянное оборудование', createdById: manager.id },
+      { equipmentId: equipment[28].id, type: PaymentType.PURCHASE, method: PaymentMethod.BANK_TRANSFER, amount: 640000, operationDate: daysAgo(80), comment: 'Покупка firewall', createdById: admin.id },
+      { equipmentId: equipment[29].id, type: PaymentType.PURCHASE, method: PaymentMethod.INVOICE, amount: 2200000, operationDate: daysAgo(70), comment: 'Покупка серверного оборудования', createdById: admin.id },
+    ],
+  });
 
   const issuanceData = [
     [0, 0, 35, 20, null, IssuanceStatus.ACTIVE],
@@ -211,6 +241,13 @@ async function main() {
         createdById: manager.id,
         assignedToId: admin.id,
         status: RepairStatus.IN_PROGRESS,
+        pickupLocationId: locationByName['Кабинет 101'].id,
+        destinationLocationId: locationByName['Ремонтная зона'].id,
+        assignedCoordinatorId: repairCoordinator.id,
+        pickupStatus: RepairPickupStatus.DELIVERED,
+        pickupDueDate: daysAgo(5),
+        deliveredAt: daysAgo(4),
+        pickupComment: 'Оборудование доставлено в ремонтную зону',
         priority: RepairPriority.HIGH,
         reason: 'Периодически выключается при нагрузке',
         diagnosis: 'Предварительно: перегрев и деградация аккумулятора',
@@ -223,6 +260,11 @@ async function main() {
         equipmentId: equipment[10].id,
         createdById: manager.id,
         status: RepairStatus.OPEN,
+        pickupLocationId: locationByName['Кабинет 205'].id,
+        destinationLocationId: locationByName['Ремонтная зона'].id,
+        assignedCoordinatorId: repairCoordinator.id,
+        pickupStatus: RepairPickupStatus.PENDING,
+        pickupDueDate: daysAgo(1),
         priority: RepairPriority.CRITICAL,
         reason: 'Ошибка узла печати, недоступен для бухгалтерии',
         cost: 68000,
@@ -235,6 +277,12 @@ async function main() {
         createdById: admin.id,
         assignedToId: admin.id,
         status: RepairStatus.IN_PROGRESS,
+        pickupLocationId: locationByName['Серверная'].id,
+        destinationLocationId: locationByName['Ремонтная зона'].id,
+        assignedCoordinatorId: repairCoordinator.id,
+        pickupStatus: RepairPickupStatus.IN_PROGRESS,
+        pickupDueDate: daysFromNow(2),
+        pickupComment: 'Согласован доступ в серверную',
         priority: RepairPriority.MEDIUM,
         reason: 'ИБП не держит нагрузку после отключения питания',
         diagnosis: 'Необходима замена батарейного блока',
@@ -247,6 +295,12 @@ async function main() {
         equipmentId: equipment[7].id,
         createdById: admin.id,
         status: RepairStatus.DONE,
+        pickupLocationId: locationByName['Склад'].id,
+        destinationLocationId: locationByName['Ремонтная зона'].id,
+        assignedCoordinatorId: repairCoordinator.id,
+        pickupStatus: RepairPickupStatus.DELIVERED,
+        pickupDueDate: daysAgo(23),
+        deliveredAt: daysAgo(23),
         priority: RepairPriority.LOW,
         reason: 'Проверка изображения перед повторной выдачей',
         diagnosis: 'Дефектов не найдено',
@@ -303,6 +357,9 @@ async function main() {
       { userId: manager.id, action: 'issuance.create', entityType: 'Issuance', entityId: '1', metadata: { equipment: equipment[0].inventoryNumber, employee: employees[0].fullName }, createdAt: daysAgo(18) },
       { userId: manager.id, action: 'issuance.return', entityType: 'Issuance', entityId: '14', metadata: { comment: 'Возврат после планового использования' }, createdAt: daysAgo(12) },
       { userId: admin.id, action: 'repair.create', entityType: 'RepairTicket', entityId: '1', metadata: { priority: 'HIGH' }, createdAt: daysAgo(6) },
+      { userId: manager.id, action: 'repair_pickup.assign', entityType: 'RepairTicket', entityId: '2', metadata: { coordinator: repairCoordinator.username }, createdAt: daysAgo(2) },
+      { userId: repairCoordinator.id, action: 'repair_pickup.status', entityType: 'RepairTicket', entityId: '1', metadata: { status: 'DELIVERED' }, createdAt: daysAgo(4) },
+      { userId: manager.id, action: 'finance.operation_create', entityType: 'EquipmentFinancialOperation', entityId: '1', metadata: { type: 'PURCHASE', amount: 420000 }, createdAt: daysAgo(15) },
       { userId: manager.id, action: 'inventory.start', entityType: 'InventoryCheck', entityId: String(inventoryCheck.id), metadata: { title: inventoryCheck.title }, createdAt: daysAgo(3) },
       { userId: auditor.id, action: 'report.export', entityType: 'Report', entityId: 'equipment.csv', metadata: { format: 'csv' }, createdAt: daysAgo(1) },
     ],
@@ -313,6 +370,8 @@ async function main() {
       { userId: admin.id, title: 'Критичный ремонт', message: 'МФУ Canon imageRUNNER требует ремонта узла печати.', type: NotificationType.ERROR, createdAt: daysAgo(2) },
       { userId: manager.id, title: 'Просроченные выдачи', message: 'Найдено 3 просроченные выдачи оборудования.', type: NotificationType.WARNING, createdAt: daysAgo(1) },
       { userId: inventoryManager.id, title: 'Инвентаризация доступна', message: 'Вы можете создавать проверки и отмечать состояние оборудования.', type: NotificationType.INFO, createdAt: daysAgo(2) },
+      { userId: repairCoordinator.id, title: 'Задача доставки в ремонт', message: 'Заберите МФУ Canon imageRUNNER из Кабинет 205 и доставьте в Ремонтная зона.', type: NotificationType.WARNING, createdAt: daysAgo(1) },
+      { userId: repairCoordinator.id, title: 'Задача в работе', message: 'ИБП APC Smart-UPS 1500 ожидает доставки в ремонтную зону.', type: NotificationType.INFO, createdAt: daysAgo(2) },
       { userId: manager.id, title: 'Инвентаризация в работе', message: 'Плановая инвентаризация май 2026 ожидает завершения.', type: NotificationType.INFO, createdAt: daysAgo(3) },
       { userId: employeeUser.id, title: 'Оборудование закреплено', message: 'За вами закреплено demo-оборудование для просмотра в системе.', type: NotificationType.SUCCESS, createdAt: daysAgo(4) },
       { userId: auditor.id, title: 'Доступ к журналу аудита', message: 'Вы можете просматривать отчёты и историю действий.', type: NotificationType.INFO, createdAt: daysAgo(5) },

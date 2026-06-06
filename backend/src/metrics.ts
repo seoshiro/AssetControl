@@ -5,6 +5,7 @@ import prisma from './lib/prisma';
 const EQUIPMENT_STATUSES = ['AVAILABLE', 'IN_USE', 'REPAIR', 'RESERVED', 'WRITTEN_OFF', 'LOST'];
 const REPAIR_STATUSES = ['OPEN', 'IN_PROGRESS', 'DONE', 'CANCELLED'];
 const INVENTORY_STATUSES = ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const REPAIR_PICKUP_STATUSES = ['PENDING', 'NOTIFIED', 'IN_PROGRESS', 'PICKED_UP', 'DELIVERED', 'CANCELLED'];
 
 export const metricsRegister = new client.Registry();
 
@@ -94,6 +95,61 @@ export const auditLogsTotal = new client.Gauge({
   registers: [metricsRegister],
 });
 
+export const repairPickupTotal = new client.Gauge({
+  name: 'repair_pickup_total',
+  help: 'Total repair pickup logistics tasks',
+  registers: [metricsRegister],
+});
+
+export const repairPickupOverdueTotal = new client.Gauge({
+  name: 'repair_pickup_overdue_total',
+  help: 'Repair pickup tasks that are overdue',
+  registers: [metricsRegister],
+});
+
+export const repairPickupByStatus = new client.Gauge({
+  name: 'repair_pickup_by_status',
+  help: 'Repair pickup tasks grouped by logistics status',
+  labelNames: ['status'] as const,
+  registers: [metricsRegister],
+});
+
+export const repairDeliveryCompletedTotal = new client.Gauge({
+  name: 'repair_delivery_completed_total',
+  help: 'Repair pickup tasks delivered to repair destination',
+  registers: [metricsRegister],
+});
+
+export const equipmentPurchaseValueTotal = new client.Gauge({
+  name: 'equipment_purchase_value_total',
+  help: 'Total purchase value of registered equipment assets',
+  registers: [metricsRegister],
+});
+
+export const equipmentResidualValueTotal = new client.Gauge({
+  name: 'equipment_residual_value_total',
+  help: 'Total residual value of registered equipment assets',
+  registers: [metricsRegister],
+});
+
+export const equipmentServiceCostTotal = new client.Gauge({
+  name: 'equipment_service_cost_total',
+  help: 'Total repair and service cost recorded for equipment assets',
+  registers: [metricsRegister],
+});
+
+export const highDepreciationEquipmentTotal = new client.Gauge({
+  name: 'high_depreciation_equipment_total',
+  help: 'Equipment assets with depreciation percent greater than or equal to 60',
+  registers: [metricsRegister],
+});
+
+export const expensiveMaintenanceEquipmentTotal = new client.Gauge({
+  name: 'expensive_maintenance_equipment_total',
+  help: 'Equipment assets marked as expensive to maintain',
+  registers: [metricsRegister],
+});
+
 function normalizeRoute(req: Request): string {
   const withoutQuery = req.originalUrl.split('?')[0] || req.path;
   return withoutQuery
@@ -140,6 +196,13 @@ export async function updateBusinessMetrics() {
       inventoryCount,
       inventoryStatusCounts,
       auditCount,
+      pickupCount,
+      pickupOverdueCount,
+      pickupStatusCounts,
+      pickupDeliveredCount,
+      equipmentFinance,
+      highDepreciationCount,
+      expensiveMaintenanceCount,
     ] = await Promise.all([
       prisma.equipment.count(),
       prisma.equipment.groupBy({ by: ['status'], _count: { _all: true } }),
@@ -161,6 +224,25 @@ export async function updateBusinessMetrics() {
       prisma.inventoryCheck.count(),
       prisma.inventoryCheck.groupBy({ by: ['status'], _count: { _all: true } }),
       prisma.auditLog.count(),
+      prisma.repairTicket.count({ where: { assignedCoordinatorId: { not: null } } }),
+      prisma.repairTicket.count({
+        where: {
+          assignedCoordinatorId: { not: null },
+          pickupDueDate: { lt: new Date() },
+          pickupStatus: { notIn: ['DELIVERED', 'CANCELLED'] },
+        },
+      }),
+      prisma.repairTicket.groupBy({ by: ['pickupStatus'], where: { assignedCoordinatorId: { not: null } }, _count: { _all: true } }),
+      prisma.repairTicket.count({ where: { pickupStatus: 'DELIVERED' } }),
+      prisma.equipment.aggregate({
+        _sum: {
+          purchasePrice: true,
+          residualValue: true,
+          serviceCostTotal: true,
+        },
+      }),
+      prisma.equipment.count({ where: { depreciationPercent: { gte: 60 } } }),
+      prisma.equipment.count({ where: { financialStatus: 'EXPENSIVE_MAINTENANCE' } }),
     ]);
 
     equipmentTotal.set(equipmentCount);
@@ -170,6 +252,14 @@ export async function updateBusinessMetrics() {
     repairTicketsTotal.set(repairCount);
     inventoryChecksTotal.set(inventoryCount);
     auditLogsTotal.set(auditCount);
+    repairPickupTotal.set(pickupCount);
+    repairPickupOverdueTotal.set(pickupOverdueCount);
+    repairDeliveryCompletedTotal.set(pickupDeliveredCount);
+    equipmentPurchaseValueTotal.set(Number(equipmentFinance._sum.purchasePrice || 0));
+    equipmentResidualValueTotal.set(Number(equipmentFinance._sum.residualValue || 0));
+    equipmentServiceCostTotal.set(Number(equipmentFinance._sum.serviceCostTotal || 0));
+    highDepreciationEquipmentTotal.set(highDepreciationCount);
+    expensiveMaintenanceEquipmentTotal.set(expensiveMaintenanceCount);
 
     for (const status of EQUIPMENT_STATUSES) {
       equipmentByStatus.set({ status }, 0);
@@ -190,6 +280,13 @@ export async function updateBusinessMetrics() {
     }
     for (const item of inventoryStatusCounts) {
       inventoryChecksByStatus.set({ status: item.status }, item._count._all);
+    }
+
+    for (const status of REPAIR_PICKUP_STATUSES) {
+      repairPickupByStatus.set({ status }, 0);
+    }
+    for (const item of pickupStatusCounts) {
+      repairPickupByStatus.set({ status: item.pickupStatus }, item._count._all);
     }
   } catch {
     equipmentDbUp.set(0);

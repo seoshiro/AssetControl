@@ -3,7 +3,10 @@ import {
   EquipmentStatus,
   InventoryItemStatus,
   IssuanceStatus,
+  PaymentMethod,
+  PaymentType,
   Prisma,
+  RepairPickupStatus,
   RepairPriority,
   RepairStatus,
   Role,
@@ -26,6 +29,7 @@ import {
 import { ApiError } from '../utils/apiError';
 
 const router = Router();
+const closedPickupStatuses: RepairPickupStatus[] = [RepairPickupStatus.DELIVERED, RepairPickupStatus.CANCELLED];
 
 const canViewReports = requireRoles(Role.ADMIN, Role.MANAGER, Role.INVENTORY_MANAGER, Role.AUDITOR, Role.VIEWER);
 const canViewAuditReport = requireRoles(Role.ADMIN, Role.AUDITOR);
@@ -154,6 +158,11 @@ router.get('/equipment.csv', authenticate, canViewReports, asyncHandler(async (r
     holder: item.currentHolder?.fullName,
     department: item.currentHolder?.department.name,
     purchasePrice: item.purchasePrice?.toString(),
+    currentValue: item.currentValue?.toString(),
+    depreciationPercent: item.depreciationPercent?.toString(),
+    residualValue: item.residualValue?.toString(),
+    serviceCostTotal: item.serviceCostTotal?.toString(),
+    financialStatus: item.financialStatus,
     warrantyUntil: item.warrantyUntil?.toISOString().slice(0, 10),
   })));
 }));
@@ -238,6 +247,9 @@ router.get('/equipment.pdf', authenticate, canViewReports, asyncHandler(async (r
     return acc;
   }, {});
   const totalValue = items.reduce((sum, item) => sum + Number(item.purchasePrice || 0), 0);
+  const residualValue = items.reduce((sum, item) => sum + Number(item.residualValue ?? item.currentValue ?? item.purchasePrice ?? 0), 0);
+  const serviceCost = items.reduce((sum, item) => sum + Number(item.serviceCostTotal || 0), 0);
+  const highDepreciation = items.filter((item) => Number(item.depreciationPercent || 0) >= 60).length;
 
   await auditLog(req, 'report.export', 'Report', 'equipment.pdf', { filters });
   await sendPdf(req, res, `equipment-report-${dateStamp()}.pdf`, {
@@ -251,6 +263,9 @@ router.get('/equipment.pdf', authenticate, canViewReports, asyncHandler(async (r
       { label: 'В ремонте', value: counts.REPAIR || 0, tone: 'amber' },
       { label: 'Списано / потеряно', value: (counts.WRITTEN_OFF || 0) + (counts.LOST || 0), tone: 'red' },
       { label: 'Стоимость активов', value: formatMoney(totalValue), tone: 'neutral' },
+      { label: 'Остаточная стоимость', value: formatMoney(residualValue), tone: 'blue' },
+      { label: 'Расходы на ремонт', value: formatMoney(serviceCost), tone: 'amber' },
+      { label: 'Высокий износ', value: highDepreciation, tone: 'red' },
     ],
     breakdown: statusCards(counts, {
       AVAILABLE: 'Available',
@@ -267,8 +282,9 @@ router.get('/equipment.pdf', authenticate, canViewReports, asyncHandler(async (r
       { header: 'Статус', key: 'status', width: 72, status: true },
       { header: 'Владелец', key: 'holder', width: 96 },
       { header: 'Локация', key: 'location', width: 76 },
-      { header: 'Покупка', key: 'purchaseDate', width: 58 },
-      { header: 'Гарантия', key: 'warrantyUntil', width: 58 },
+      { header: 'Остаток', key: 'residualValue', width: 66, align: 'right' },
+      { header: 'Износ', key: 'depreciationPercent', width: 48, align: 'right' },
+      { header: 'Фин. статус', key: 'financialStatus', width: 72, status: true },
     ],
     rows: items.map((item) => ({
       inventoryNumber: item.inventoryNumber,
@@ -277,8 +293,9 @@ router.get('/equipment.pdf', authenticate, canViewReports, asyncHandler(async (r
       status: item.status,
       holder: item.currentHolder?.fullName || '—',
       location: item.location?.name || '—',
-      purchaseDate: formatCompactDate(item.purchaseDate),
-      warrantyUntil: formatCompactDate(item.warrantyUntil),
+      residualValue: formatMoney(item.residualValue ?? item.currentValue ?? item.purchasePrice),
+      depreciationPercent: `${Number(item.depreciationPercent || 0).toFixed(0)}%`,
+      financialStatus: item.financialStatus,
     })),
     notes: ['CSV используется для обработки данных в Excel, PDF — для официального представления и печати отчётов.'],
   });
@@ -448,6 +465,138 @@ router.get('/inventory/:id.pdf', authenticate, canViewReports, asyncHandler(asyn
     })),
     notes: ['Документ может использоваться как приложение к внутренней инвентаризационной ведомости предприятия.'],
     signature: true,
+  });
+}));
+
+router.get('/finance.csv', authenticate, canViewReports, asyncHandler(async (req, res) => {
+  const items = await prisma.equipment.findMany({
+    include: { category: true },
+    orderBy: { purchasePrice: 'desc' },
+  });
+  await auditLog(req, 'report.export', 'Report', 'finance.csv');
+  sendCsv(res, 'finance.csv', items.map((item) => ({
+    inventoryNumber: item.inventoryNumber,
+    name: item.name,
+    category: item.category.name,
+    purchasePrice: item.purchasePrice?.toString(),
+    currentValue: item.currentValue?.toString(),
+    depreciationPercent: item.depreciationPercent?.toString(),
+    residualValue: item.residualValue?.toString(),
+    serviceCostTotal: item.serviceCostTotal?.toString(),
+    financialStatus: item.financialStatus,
+  })));
+}));
+
+router.get('/finance.pdf', authenticate, canViewReports, asyncHandler(async (req, res) => {
+  const items = await prisma.equipment.findMany({
+    include: { category: true },
+    orderBy: { purchasePrice: 'desc' },
+  });
+  const totalValue = items.reduce((sum, item) => sum + Number(item.purchasePrice || 0), 0);
+  const residualValue = items.reduce((sum, item) => sum + Number(item.residualValue ?? item.currentValue ?? item.purchasePrice ?? 0), 0);
+  const serviceCost = items.reduce((sum, item) => sum + Number(item.serviceCostTotal || 0), 0);
+  const highDepreciation = items.filter((item) => Number(item.depreciationPercent || 0) >= 60);
+  const expensiveMaintenance = items.filter((item) => item.financialStatus === 'EXPENSIVE_MAINTENANCE');
+
+  await auditLog(req, 'report.export', 'Report', 'finance.pdf');
+  await sendPdf(req, res, `equipment-finance-report-${dateStamp()}.pdf`, {
+    title: 'Equipment Finance Report',
+    description: 'Внутренний финансовый отчёт по оборудованию: стоимость покупки, текущая оценка, износ, остаточная стоимость и расходы на обслуживание.',
+    summary: [
+      { label: 'Стоимость покупки', value: formatMoney(totalValue), tone: 'blue' },
+      { label: 'Остаточная стоимость', value: formatMoney(residualValue), tone: 'green' },
+      { label: 'Расходы на ремонт', value: formatMoney(serviceCost), tone: 'amber' },
+      { label: 'Высокий износ', value: highDepreciation.length, tone: 'red' },
+      { label: 'Дорогое обслуживание', value: expensiveMaintenance.length, tone: 'red' },
+    ],
+    columns: [
+      { header: 'Инв. номер', key: 'inventoryNumber', width: 78 },
+      { header: 'Оборудование', key: 'name', width: 130 },
+      { header: 'Категория', key: 'category', width: 76 },
+      { header: 'Покупка', key: 'purchasePrice', width: 74, align: 'right' },
+      { header: 'Остаток', key: 'residualValue', width: 74, align: 'right' },
+      { header: 'Износ', key: 'depreciationPercent', width: 54, align: 'right' },
+      { header: 'Обслуживание', key: 'serviceCostTotal', width: 82, align: 'right' },
+      { header: 'Статус', key: 'financialStatus', width: 78, status: true },
+    ],
+    rows: items.map((item) => ({
+      inventoryNumber: item.inventoryNumber,
+      name: item.name,
+      category: item.category.name,
+      purchasePrice: formatMoney(item.purchasePrice),
+      residualValue: formatMoney(item.residualValue ?? item.currentValue ?? item.purchasePrice),
+      depreciationPercent: `${Number(item.depreciationPercent || 0).toFixed(0)}%`,
+      serviceCostTotal: formatMoney(item.serviceCostTotal),
+      financialStatus: item.financialStatus,
+    })),
+    notes: ['Это внутренний финансовый учёт предприятия без интеграции с банками или платёжными системами.'],
+  });
+}));
+
+router.get('/repair-pickups.csv', authenticate, canViewReports, asyncHandler(async (req, res) => {
+  const items = await prisma.repairTicket.findMany({
+    where: { assignedCoordinatorId: { not: null } },
+    include: { equipment: true, pickupLocation: true, destinationLocation: true, assignedCoordinator: true },
+    orderBy: { pickupDueDate: 'asc' },
+  });
+  await auditLog(req, 'report.export', 'Report', 'repair-pickups.csv');
+  sendCsv(res, 'repair-pickups.csv', items.map((item) => ({
+    equipment: item.equipment.inventoryNumber,
+    equipmentName: item.equipment.name,
+    coordinator: item.assignedCoordinator?.username,
+    pickupLocation: item.pickupLocation?.name,
+    destinationLocation: item.destinationLocation?.name,
+    pickupDueDate: item.pickupDueDate?.toISOString().slice(0, 10),
+    pickupStatus: item.pickupStatus,
+    deliveredAt: item.deliveredAt?.toISOString().slice(0, 10),
+    overdue: item.pickupDueDate && item.pickupDueDate < new Date() && !closedPickupStatuses.includes(item.pickupStatus) ? 'yes' : 'no',
+  })));
+}));
+
+router.get('/repair-pickups.pdf', authenticate, canViewReports, asyncHandler(async (req, res) => {
+  const items = await prisma.repairTicket.findMany({
+    where: { assignedCoordinatorId: { not: null } },
+    include: { equipment: true, pickupLocation: true, destinationLocation: true, assignedCoordinator: true },
+    orderBy: { pickupDueDate: 'asc' },
+  });
+  const counts = items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.pickupStatus] = (acc[item.pickupStatus] || 0) + 1;
+    return acc;
+  }, {});
+  const overdue = items.filter((item) => item.pickupDueDate && item.pickupDueDate < new Date() && !closedPickupStatuses.includes(item.pickupStatus));
+
+  await auditLog(req, 'report.export', 'Report', 'repair-pickups.pdf');
+  await sendPdf(req, res, `repair-pickups-report-${dateStamp()}.pdf`, {
+    title: 'Repair Pickup Logistics Report',
+    description: 'Отчёт по физической доставке оборудования в ремонт: координатор, откуда забрать, куда доставить, срок, статус и просрочка.',
+    summary: [
+      { label: 'Всего задач', value: items.length, tone: 'blue' },
+      { label: 'Ожидает забора', value: counts.PENDING || 0, tone: 'amber' },
+      { label: 'В работе', value: counts.IN_PROGRESS || 0, tone: 'blue' },
+      { label: 'Доставлено', value: counts.DELIVERED || 0, tone: 'green' },
+      { label: 'Просрочено', value: overdue.length, tone: 'red' },
+    ],
+    breakdown: statusCards(counts, { PENDING: 'Pending', NOTIFIED: 'Notified', IN_PROGRESS: 'In progress', PICKED_UP: 'Picked up', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' }),
+    columns: [
+      { header: 'Оборудование', key: 'equipment', width: 126 },
+      { header: 'Инв. номер', key: 'inventoryNumber', width: 76 },
+      { header: 'Координатор', key: 'coordinator', width: 82 },
+      { header: 'Откуда', key: 'pickupLocation', width: 86 },
+      { header: 'Куда', key: 'destinationLocation', width: 86 },
+      { header: 'Срок', key: 'pickupDueDate', width: 62 },
+      { header: 'Статус', key: 'pickupStatus', width: 76, status: true },
+      { header: 'Просрочка', key: 'overdue', width: 58, status: true },
+    ],
+    rows: items.map((item) => ({
+      equipment: item.equipment.name,
+      inventoryNumber: item.equipment.inventoryNumber,
+      coordinator: item.assignedCoordinator?.username || '—',
+      pickupLocation: item.pickupLocation?.name || '—',
+      destinationLocation: item.destinationLocation?.name || '—',
+      pickupDueDate: formatCompactDate(item.pickupDueDate),
+      pickupStatus: item.pickupStatus,
+      overdue: item.pickupDueDate && item.pickupDueDate < new Date() && !closedPickupStatuses.includes(item.pickupStatus) ? 'OVERDUE' : 'OK',
+    })),
   });
 }));
 

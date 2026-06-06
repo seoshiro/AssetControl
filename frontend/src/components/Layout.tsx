@@ -23,7 +23,7 @@ export default function Layout() {
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
-            aria-label="Закрыть меню"
+            aria-label="Закрыть меню по фону"
             className="absolute inset-0 bg-surface-950/35"
             onClick={() => setDrawerOpen(false)}
           />

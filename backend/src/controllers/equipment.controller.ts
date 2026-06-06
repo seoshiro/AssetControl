@@ -6,6 +6,7 @@ import prisma from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { ApiError } from '../utils/apiError';
 import { auditLog } from '../utils/audit';
+import { financialSnapshot } from '../services/finance.service';
 
 const listQuerySchema = z.object({
   search: z.string().optional(),
@@ -27,6 +28,7 @@ const equipmentSchema = z.object({
   status: z.nativeEnum(EquipmentStatus).default(EquipmentStatus.AVAILABLE),
   purchaseDate: z.coerce.date(),
   purchasePrice: z.coerce.number().nonnegative().optional().nullable(),
+  currentValue: z.coerce.number().nonnegative().optional().nullable(),
   warrantyUntil: z.coerce.date().optional().nullable(),
   locationId: z.coerce.number().int().optional().nullable(),
   description: z.string().optional().nullable(),
@@ -104,8 +106,19 @@ export async function getEquipmentById(req: AuthRequest, res: Response): Promise
         orderBy: { issuedAt: 'desc' },
       },
       repairs: {
-        include: { createdBy: { select: { id: true, username: true } }, assignedTo: { select: { id: true, username: true } } },
+        include: {
+          createdBy: { select: { id: true, username: true } },
+          assignedTo: { select: { id: true, username: true } },
+          pickupLocation: true,
+          destinationLocation: true,
+          assignedCoordinator: { select: { id: true, username: true, role: true } },
+        },
         orderBy: { createdAt: 'desc' },
+      },
+      financialOperations: {
+        include: { createdBy: { select: { id: true, username: true, role: true } } },
+        orderBy: { operationDate: 'desc' },
+        take: 20,
       },
     },
   });
@@ -119,12 +132,27 @@ export async function getEquipmentById(req: AuthRequest, res: Response): Promise
     take: 30,
   });
 
-  res.json({ ...equipment, auditLogs });
+  const role = req.user?.role || '';
+  const canSeeFinancialOperations = ['ADMIN', 'MANAGER', 'INVENTORY_MANAGER', 'AUDITOR'].includes(role);
+
+  res.json({
+    ...equipment,
+    financialOperations: canSeeFinancialOperations ? equipment.financialOperations : [],
+    financialOperationsHidden: !canSeeFinancialOperations,
+    auditLogs,
+  });
 }
 
 export async function createEquipment(req: AuthRequest, res: Response): Promise<void> {
   const body = equipmentSchema.parse(req.body);
   const categoryId = await resolveCategoryId(body.categoryId, body.category);
+
+  const finance = financialSnapshot({
+    purchasePrice: body.purchasePrice,
+    currentValue: body.currentValue ?? body.purchasePrice,
+    serviceCostTotal: 0,
+    equipmentStatus: body.status,
+  });
 
   const equipment = await prisma.equipment.create({
     data: {
@@ -135,6 +163,11 @@ export async function createEquipment(req: AuthRequest, res: Response): Promise<
       status: body.status,
       purchaseDate: body.purchaseDate,
       purchasePrice: body.purchasePrice,
+      currentValue: finance.currentValue,
+      depreciationPercent: finance.depreciationPercent,
+      residualValue: finance.residualValue,
+      serviceCostTotal: finance.serviceCostTotal,
+      financialStatus: finance.financialStatus,
       warrantyUntil: body.warrantyUntil,
       locationId: body.locationId,
       description: body.description,
@@ -155,6 +188,13 @@ export async function updateEquipment(req: AuthRequest, res: Response): Promise<
   const categoryId =
     body.categoryId || body.category ? await resolveCategoryId(body.categoryId, body.category) : existing.categoryId;
 
+  const finance = financialSnapshot({
+    purchasePrice: body.purchasePrice ?? existing.purchasePrice,
+    currentValue: body.currentValue ?? existing.currentValue ?? body.purchasePrice ?? existing.purchasePrice,
+    serviceCostTotal: existing.serviceCostTotal,
+    equipmentStatus: body.status ?? existing.status,
+  });
+
   const equipment = await prisma.equipment.update({
     where: { id },
     data: {
@@ -165,6 +205,11 @@ export async function updateEquipment(req: AuthRequest, res: Response): Promise<
       status: body.status ?? existing.status,
       purchaseDate: body.purchaseDate ?? existing.purchaseDate,
       purchasePrice: body.purchasePrice ?? existing.purchasePrice,
+      currentValue: finance.currentValue,
+      depreciationPercent: finance.depreciationPercent,
+      residualValue: finance.residualValue,
+      serviceCostTotal: finance.serviceCostTotal,
+      financialStatus: finance.financialStatus,
       warrantyUntil: body.warrantyUntil ?? existing.warrantyUntil,
       locationId: body.locationId ?? existing.locationId,
       description: body.description ?? existing.description,

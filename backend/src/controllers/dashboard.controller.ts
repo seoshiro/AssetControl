@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { EquipmentStatus, IssuanceStatus, RepairPriority, RepairStatus } from '@prisma/client';
+import { EquipmentStatus, IssuanceStatus, RepairPickupStatus, RepairPriority, RepairStatus } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middleware/auth';
 
@@ -19,6 +19,10 @@ export async function getDashboardStats(_req: AuthRequest, res: Response): Promi
     overdueIssuances,
     activeRepairs,
     criticalRepairs,
+    pickupPending,
+    pickupInProgress,
+    pickupDelivered,
+    pickupOverdue,
     notifications,
     issuances30,
   ] = await Promise.all([
@@ -26,7 +30,7 @@ export async function getDashboardStats(_req: AuthRequest, res: Response): Promi
     prisma.equipment.groupBy({ by: ['status'], _count: { id: true } }),
     prisma.equipment.groupBy({ by: ['categoryId'], _count: { id: true } }),
     prisma.issuance.groupBy({ by: ['employeeId'], where: { returnedAt: null }, _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 6 }),
-    prisma.equipment.aggregate({ _sum: { purchasePrice: true } }),
+    prisma.equipment.aggregate({ _sum: { purchasePrice: true, residualValue: true, serviceCostTotal: true } }),
     prisma.issuance.findMany({
       take: 6,
       orderBy: { issuedAt: 'desc' },
@@ -42,6 +46,10 @@ export async function getDashboardStats(_req: AuthRequest, res: Response): Promi
     }),
     prisma.repairTicket.count({ where: { status: { in: [RepairStatus.OPEN, RepairStatus.IN_PROGRESS] } } }),
     prisma.repairTicket.count({ where: { priority: RepairPriority.CRITICAL, status: { notIn: [RepairStatus.DONE, RepairStatus.CANCELLED] } } }),
+    prisma.repairTicket.count({ where: { pickupStatus: { in: [RepairPickupStatus.PENDING, RepairPickupStatus.NOTIFIED] }, assignedCoordinatorId: { not: null } } }),
+    prisma.repairTicket.count({ where: { pickupStatus: { in: [RepairPickupStatus.IN_PROGRESS, RepairPickupStatus.PICKED_UP] } } }),
+    prisma.repairTicket.count({ where: { pickupStatus: RepairPickupStatus.DELIVERED } }),
+    prisma.repairTicket.count({ where: { pickupDueDate: { lt: now }, pickupStatus: { notIn: [RepairPickupStatus.DELIVERED, RepairPickupStatus.CANCELLED] }, assignedCoordinatorId: { not: null } } }),
     prisma.notification.findMany({ take: 6, orderBy: { createdAt: 'desc' }, where: { readAt: null } }),
     prisma.issuance.findMany({ where: { issuedAt: { gte: since } }, select: { issuedAt: true, returnedAt: true } }),
   ]);
@@ -84,9 +92,15 @@ export async function getDashboardStats(_req: AuthRequest, res: Response): Promi
     writtenOff: statusStats.WRITTEN_OFF,
     lost: statusStats.LOST,
     totalValue: Number(aggregate._sum.purchasePrice || 0),
+    residualValue: Number(aggregate._sum.residualValue || 0),
+    repairServiceCost: Number(aggregate._sum.serviceCostTotal || 0),
     overdueIssuances,
     activeRepairs,
     criticalRepairs,
+    pickupPending,
+    pickupInProgress,
+    pickupDelivered,
+    pickupOverdue,
     statusStats: Object.entries(statusStats).map(([status, count]) => ({ status, count })),
     categoryStats: byCategory.map((item) => ({ category: categoryById[item.categoryId] || 'Без категории', count: item._count.id })),
     departmentStats: [...departmentCounts.entries()].map(([department, count]) => ({ department, count })),

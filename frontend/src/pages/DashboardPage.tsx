@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Archive, Bank, Clock, SealCheck, Toolbox, WarningCircle } from '@phosphor-icons/react';
+import { Archive, Bank, Clock, SealCheck, Toolbox, Truck, WarningCircle } from '@phosphor-icons/react';
 import api from '../api/axios';
 import StatusBadge from '../components/StatusBadge';
 import { ContentCard, PageContainer, PageHeader, ScrollArea } from '../components/PageLayout';
@@ -16,7 +16,37 @@ const statusLabels: Record<string, string> = {
 };
 
 const colors = ['var(--success)', 'var(--accent)', 'var(--warning)', 'var(--muted)', 'var(--danger)', 'var(--text-secondary)'];
-const chartTooltip = { background: 'var(--surface-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)' };
+const chartTooltipWrapper = { zIndex: 30, outline: 'none', pointerEvents: 'none' as const };
+const chartTooltipProps = {
+  wrapperStyle: chartTooltipWrapper,
+  offset: 20,
+};
+
+function ChartTooltip({ active, label, payload }: { active?: boolean; label?: string; payload?: any[] }) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="max-w-[220px] rounded-md border border-surface-200 bg-surface-50 px-3 py-2 text-xs text-surface-900 shadow-raised">
+      {label ? <p className="mb-1 font-bold text-surface-950">{label}</p> : null}
+      <div className="space-y-1">
+        {payload.map((entry) => (
+          <div key={`${entry.name}-${entry.dataKey || entry.value}`} className="flex min-w-0 items-center gap-2">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ background: entry.color || entry.payload?.fill || 'var(--accent)' }}
+            />
+            <span className="truncate font-semibold text-surface-700">{entry.name}:</span>
+            <span className="shrink-0 font-extrabold text-surface-950">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function compactMoney(value: number) {
+  return `${Math.round((value || 0) / 1000).toLocaleString('ru-RU')}k ₸`;
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -35,7 +65,11 @@ export default function DashboardPage() {
     { title: 'На ремонте', value: stats.repair, icon: Toolbox, tone: 'violet' as const },
     { title: 'Просрочено', value: stats.overdueIssuances, icon: Clock, tone: 'red' as const },
     { title: 'Списано/потеряно', value: stats.writtenOff + stats.lost, icon: WarningCircle, tone: 'red' as const },
-    { title: 'Балансовая стоимость', value: `${Math.round(stats.totalValue / 1000).toLocaleString('ru-RU')}k ₸`, icon: Bank, tone: 'blue' as const },
+    { title: 'Балансовая стоимость', value: compactMoney(stats.totalValue), icon: Bank, tone: 'blue' as const },
+    { title: 'Остаточная стоимость', value: compactMoney(stats.residualValue), icon: Bank, tone: 'green' as const },
+    { title: 'Ремонт/сервис', value: compactMoney(stats.repairServiceCost), icon: Toolbox, tone: 'violet' as const },
+    { title: 'Передача в ремонт', value: stats.pickupPending + stats.pickupInProgress, icon: Truck, tone: 'violet' as const },
+    { title: 'Доставлено в ремонт', value: stats.pickupDelivered, icon: Truck, tone: 'green' as const },
   ];
 
   const statusChart = stats.statusStats.map((item: any) => ({ ...item, name: statusLabels[item.status] || item.status }));
@@ -53,7 +87,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
@@ -71,7 +105,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{ fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={chartTooltip} />
+                <Tooltip {...chartTooltipProps} content={<ChartTooltip />} />
                 <Area type="monotone" dataKey="issued" name="Выдано" stroke="var(--accent)" fill="color-mix(in srgb, var(--accent) 14%, transparent)" />
                 <Area type="monotone" dataKey="returned" name="Возвращено" stroke="var(--success)" fill="color-mix(in srgb, var(--success) 14%, transparent)" />
               </AreaChart>
@@ -81,13 +115,13 @@ export default function DashboardPage() {
 
         <ContentCard>
           <h2 className="mb-4 text-lg font-extrabold text-surface-950">Статусы</h2>
-          <div className="h-72">
+          <div className="h-64 px-3 pb-2 sm:h-72 sm:px-5">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={statusChart} dataKey="count" nameKey="name" innerRadius={58} outerRadius={96} paddingAngle={2}>
+              <PieChart margin={{ top: 8, right: 12, bottom: 8, left: 12 }}>
+                <Pie data={statusChart} dataKey="count" nameKey="name" innerRadius={46} outerRadius={78} paddingAngle={2} isAnimationActive={false}>
                   {statusChart.map((_entry: any, index: number) => <Cell key={index} fill={colors[index % colors.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={chartTooltip} />
+                <Tooltip {...chartTooltipProps} content={<ChartTooltip />} cursor={false} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -103,7 +137,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="category" tick={{ fontSize: 11, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{ fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={chartTooltip} />
+                <Tooltip {...chartTooltipProps} content={<ChartTooltip />} />
                 <Bar dataKey="count" fill="var(--accent)" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

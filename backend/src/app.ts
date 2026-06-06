@@ -19,6 +19,8 @@ import reportsRoutes from './routes/reports';
 import auditRoutes from './routes/auditLog';
 import notificationsRoutes from './routes/notifications';
 import usersRoutes from './routes/users';
+import financeRoutes from './routes/finance';
+import repairPickupRoutes from './routes/repairPickups';
 
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -58,6 +60,8 @@ export function createApp() {
   app.use('/api/reports', reportsRoutes);
   app.use('/api/audit-log', auditRoutes);
   app.use('/api/notifications', notificationsRoutes);
+  app.use('/api/finance', financeRoutes);
+  app.use('/api/repair-pickups', repairPickupRoutes);
   app.use('/api/admin/users', usersRoutes);
 
   app.get('/api/health', (_req, res) => {

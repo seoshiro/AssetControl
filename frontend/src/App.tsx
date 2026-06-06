@@ -20,6 +20,8 @@ import NotificationsPage from './pages/NotificationsPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AboutProjectPage from './pages/AboutProjectPage';
 import ProfilePage from './pages/ProfilePage';
+import FinancePage from './pages/FinancePage';
+import RepairPickupTasksPage from './pages/RepairPickupTasksPage';
 
 export default function App() {
   return (
@@ -48,6 +50,16 @@ export default function App() {
               <Route path="/repairs" element={<RepairsPage />} />
               <Route path="/inventory-checks" element={<InventoryChecksPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/finance" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'INVENTORY_MANAGER', 'AUDITOR', 'VIEWER']}>
+                  <FinancePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/repair-pickups" element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'INVENTORY_MANAGER', 'REPAIR_COORDINATOR', 'AUDITOR']}>
+                  <RepairPickupTasksPage />
+                </ProtectedRoute>
+              } />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/about" element={<AboutProjectPage />} />

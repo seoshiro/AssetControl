@@ -37,4 +37,16 @@ describe('StatusBadge', () => {
     expect(getStatusLabel('DONE')).toBe('Готово');
     expect(getStatusLabel('UNKNOWN')).toBe('UNKNOWN');
   });
+
+  it('renders financial statuses with restrained severity', () => {
+    render(<StatusBadge status="EXPENSIVE_MAINTENANCE" />);
+    expect(screen.getByText('Дорогой сервис')).toHaveClass('status-danger');
+    expect(getStatusLabel('DEPRECIATED')).toBe('Высокий износ');
+  });
+
+  it('renders repair pickup workflow statuses', () => {
+    render(<StatusBadge status="DELIVERED" />);
+    expect(screen.getByText('Доставлено')).toHaveClass('status-success');
+    expect(getStatusLabel('PICKED_UP')).toBe('Забрано');
+  });
 });

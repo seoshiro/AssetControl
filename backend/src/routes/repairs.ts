@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { EquipmentStatus, RepairPriority, RepairStatus } from '@prisma/client';
+import { EquipmentStatus, NotificationType, RepairPickupStatus, RepairPriority, RepairStatus, Role } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { authenticate, canManageAssets } from '../middleware/auth';
@@ -12,6 +12,11 @@ const router = Router();
 const createSchema = z.object({
   equipmentId: z.coerce.number().int(),
   assignedToId: z.coerce.number().int().optional().nullable(),
+  pickupLocationId: z.coerce.number().int().optional().nullable(),
+  destinationLocationId: z.coerce.number().int().optional().nullable(),
+  assignedCoordinatorId: z.coerce.number().int().optional().nullable(),
+  pickupDueDate: z.coerce.date().optional().nullable(),
+  pickupComment: z.string().optional().nullable(),
   priority: z.nativeEnum(RepairPriority).default(RepairPriority.MEDIUM),
   reason: z.string().min(3),
 });
@@ -28,6 +33,9 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
       equipment: { include: { category: true, currentHolder: true } },
       createdBy: { select: { id: true, username: true } },
       assignedTo: { select: { id: true, username: true } },
+      pickupLocation: true,
+      destinationLocation: true,
+      assignedCoordinator: { select: { id: true, username: true, role: true } },
     },
     orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
   });
@@ -47,7 +55,7 @@ router.get('/dashboard', authenticate, asyncHandler(async (_req, res) => {
 router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   const ticket = await prisma.repairTicket.findUnique({
     where: { id: Number(req.params.id) },
-    include: { equipment: true, createdBy: true, assignedTo: true },
+    include: { equipment: true, createdBy: true, assignedTo: true, pickupLocation: true, destinationLocation: true, assignedCoordinator: true },
   });
   if (!ticket) throw new ApiError(404, 'Ремонтная заявка не найдена');
   res.json(ticket);
@@ -56,17 +64,39 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
 router.post('/', authenticate, canManageAssets, asyncHandler(async (req, res) => {
   const body = createSchema.parse(req.body);
   const result = await prisma.$transaction(async (tx) => {
-    const equipment = await tx.equipment.findUnique({ where: { id: body.equipmentId } });
+    const equipment = await tx.equipment.findUnique({ where: { id: body.equipmentId }, include: { location: true } });
     if (!equipment) throw new ApiError(404, 'Оборудование не найдено');
     if (equipment.status === EquipmentStatus.WRITTEN_OFF || equipment.status === EquipmentStatus.LOST) {
       throw new ApiError(400, 'Нельзя отправить в ремонт списанное или потерянное оборудование');
     }
+    const coordinator = body.assignedCoordinatorId
+      ? await tx.user.findUnique({ where: { id: body.assignedCoordinatorId } })
+      : null;
+    if (body.assignedCoordinatorId && (!coordinator || coordinator.role !== Role.REPAIR_COORDINATOR || !coordinator.isActive)) {
+      throw new ApiError(400, 'Назначьте активного координатора ремонта');
+    }
     const ticket = await tx.repairTicket.create({
-      data: { ...body, createdById: req.user?.id, status: RepairStatus.OPEN },
-      include: { equipment: true },
+      data: {
+        ...body,
+        pickupStatus: body.assignedCoordinatorId ? RepairPickupStatus.NOTIFIED : RepairPickupStatus.PENDING,
+        createdById: req.user?.id,
+        status: RepairStatus.OPEN,
+      },
+      include: { equipment: true, pickupLocation: true, destinationLocation: true, assignedCoordinator: true },
     });
     await tx.equipment.update({ where: { id: body.equipmentId }, data: { status: EquipmentStatus.REPAIR } });
     await auditLog(req, 'repair.create', 'RepairTicket', ticket.id, { equipmentId: body.equipmentId, priority: body.priority }, tx);
+    if (coordinator) {
+      await tx.notification.create({
+        data: {
+          userId: coordinator.id,
+          title: 'Новая задача доставки в ремонт',
+          message: `Вам назначена задача: забрать оборудование ${equipment.name} (${equipment.inventoryNumber}) из ${ticket.pickupLocation?.name || equipment.location?.name || 'текущей локации'} и доставить в ${ticket.destinationLocation?.name || 'ремонтную зону'}${body.pickupDueDate ? ` до ${body.pickupDueDate.toLocaleDateString('ru-RU')}` : ''}.`,
+          type: NotificationType.INFO,
+        },
+      });
+      await auditLog(req, 'repair_pickup.assign', 'RepairTicket', ticket.id, { coordinatorId: coordinator.id }, tx);
+    }
     return ticket;
   });
   res.status(201).json(result);

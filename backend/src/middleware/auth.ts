@@ -58,3 +58,7 @@ export const requireAdmin = requireRoles(Role.ADMIN);
 export const canManageAssets = requireRoles(Role.ADMIN, Role.MANAGER);
 export const canManageInventory = requireRoles(Role.ADMIN, Role.MANAGER, Role.INVENTORY_MANAGER);
 export const canViewAudit = requireRoles(Role.ADMIN, Role.AUDITOR);
+export const canViewFinance = requireRoles(Role.ADMIN, Role.MANAGER, Role.INVENTORY_MANAGER, Role.AUDITOR, Role.VIEWER);
+export const canManageFinance = requireRoles(Role.ADMIN, Role.MANAGER);
+export const canManageRepairPickup = requireRoles(Role.ADMIN, Role.MANAGER);
+export const canViewRepairPickup = requireRoles(Role.ADMIN, Role.MANAGER, Role.INVENTORY_MANAGER, Role.REPAIR_COORDINATOR, Role.AUDITOR);

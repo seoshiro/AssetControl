@@ -233,6 +233,56 @@
       "targets": [{ "expr": "sum by (method, route) (rate(http_requests_total{job=\"equipment-backend\"}[1m])) or on() label_replace(label_replace(vector(0), \"method\", \"GET\", \"\", \"\"), \"route\", \"no traffic yet\", \"\", \"\")", "legendFormat": "{{method}} {{route}}" }],
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 1, "fillOpacity": 8, "showPoints": "never" } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Repair pickup tasks",
+      "gridPos": { "x": 0, "y": 22, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(repair_pickup_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "pickup tasks" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Pickup overdue",
+      "gridPos": { "x": 4, "y": 22, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(repair_pickup_overdue_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "overdue pickup" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Residual asset value",
+      "gridPos": { "x": 8, "y": 22, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_residual_value_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "residual value" }],
+      "fieldConfig": { "defaults": { "unit": "currencyKZT", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Repair/service cost",
+      "gridPos": { "x": 13, "y": 22, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(equipment_service_cost_total{job=\"equipment-backend\"}) or vector(0)", "legendFormat": "service cost" }],
+      "fieldConfig": { "defaults": { "unit": "currencyKZT", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50000 }, { "color": "red", "value": 200000 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+    },
+    {
+      "id": 26,
+      "type": "bargauge",
+      "title": "Repair pickup by status",
+      "gridPos": { "x": 18, "y": 22, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "repair_pickup_by_status{job=\"equipment-backend\"}", "legendFormat": "{{status}}" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "displayMode": "lcd", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "values": false } }
     }
   ]
 }

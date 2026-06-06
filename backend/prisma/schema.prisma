@@ -11,6 +11,7 @@ enum Role {
   ADMIN
   MANAGER
   INVENTORY_MANAGER
+  REPAIR_COORDINATOR
   EMPLOYEE
   AUDITOR
   VIEWER
@@ -35,6 +36,39 @@ enum RepairStatus {
   OPEN
   IN_PROGRESS
   DONE
+  CANCELLED
+}
+
+enum FinancialStatus {
+  NORMAL
+  DEPRECIATED
+  EXPENSIVE_MAINTENANCE
+  WRITTEN_OFF
+}
+
+enum PaymentType {
+  PURCHASE
+  REPAIR
+  SERVICE
+  RENT
+  COMPENSATION
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  INVOICE
+  INTERNAL_ACCOUNT
+}
+
+enum RepairPickupStatus {
+  PENDING
+  NOTIFIED
+  IN_PROGRESS
+  PICKED_UP
+  DELIVERED
   CANCELLED
 }
 
@@ -79,10 +113,12 @@ model User {
   issuedItems      Issuance[]        @relation("IssuedBy")
   repairCreated    RepairTicket[]    @relation("RepairCreatedBy")
   repairAssigned   RepairTicket[]    @relation("RepairAssignedTo")
+  repairPickups     RepairTicket[]    @relation("RepairPickupCoordinator")
   inventoryChecks  InventoryCheck[]
   auditLogs        AuditLog[]
   notifications    Notification[]
   attachments      Attachment[]
+  financialOperations EquipmentFinancialOperation[]
 
   @@map("users")
 }
@@ -114,6 +150,8 @@ model Location {
   equipment   Equipment[]
   expectedIn  InventoryCheckItem[] @relation("ExpectedLocation")
   actualIn    InventoryCheckItem[] @relation("ActualLocation")
+  repairPickupFrom RepairTicket[] @relation("PickupLocation")
+  repairPickupTo   RepairTicket[] @relation("DestinationLocation")
 
   @@unique([name, room])
   @@map("locations")
@@ -145,6 +183,11 @@ model Equipment {
   status          EquipmentStatus @default(AVAILABLE)
   purchaseDate    DateTime        @map("purchase_date")
   purchasePrice   Decimal?        @db.Decimal(12, 2) @map("purchase_price")
+  currentValue    Decimal?        @db.Decimal(12, 2) @map("current_value")
+  depreciationPercent Decimal?     @db.Decimal(5, 2) @map("depreciation_percent")
+  residualValue   Decimal?        @db.Decimal(12, 2) @map("residual_value")
+  serviceCostTotal Decimal        @default(0) @db.Decimal(12, 2) @map("service_cost_total")
+  financialStatus FinancialStatus @default(NORMAL) @map("financial_status")
   warrantyUntil   DateTime?       @map("warranty_until")
   locationId      Int?            @map("location_id")
   currentHolderId Int?            @map("current_holder_id")
@@ -158,6 +201,7 @@ model Equipment {
   issuances      Issuance[]
   repairs        RepairTicket[]
   inventoryItems InventoryCheckItem[]
+  financialOperations EquipmentFinancialOperation[]
 
   @@index([status])
   @@index([categoryId])
@@ -191,6 +235,13 @@ model RepairTicket {
   equipmentId  Int            @map("equipment_id")
   createdById  Int?           @map("created_by_id")
   assignedToId Int?           @map("assigned_to_id")
+  pickupLocationId Int?       @map("pickup_location_id")
+  destinationLocationId Int?  @map("destination_location_id")
+  assignedCoordinatorId Int?  @map("assigned_coordinator_id")
+  pickupStatus RepairPickupStatus @default(PENDING) @map("pickup_status")
+  pickupComment String?       @map("pickup_comment")
+  pickupDueDate DateTime?     @map("pickup_due_date")
+  deliveredAt  DateTime?      @map("delivered_at")
   status       RepairStatus   @default(OPEN)
   priority     RepairPriority @default(MEDIUM)
   reason       String
@@ -203,10 +254,36 @@ model RepairTicket {
   equipment  Equipment @relation(fields: [equipmentId], references: [id])
   createdBy  User?     @relation("RepairCreatedBy", fields: [createdById], references: [id])
   assignedTo User?     @relation("RepairAssignedTo", fields: [assignedToId], references: [id])
+  pickupLocation Location? @relation("PickupLocation", fields: [pickupLocationId], references: [id])
+  destinationLocation Location? @relation("DestinationLocation", fields: [destinationLocationId], references: [id])
+  assignedCoordinator User? @relation("RepairPickupCoordinator", fields: [assignedCoordinatorId], references: [id])
 
   @@index([status])
   @@index([priority])
+  @@index([pickupStatus])
+  @@index([assignedCoordinatorId])
   @@map("repair_tickets")
+}
+
+model EquipmentFinancialOperation {
+  id            Int           @id @default(autoincrement())
+  equipmentId   Int          @map("equipment_id")
+  type          PaymentType
+  method        PaymentMethod
+  amount        Decimal      @db.Decimal(12, 2)
+  operationDate DateTime     @default(now()) @map("operation_date")
+  comment       String?
+  createdById   Int?         @map("created_by_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation(fields: [createdById], references: [id])
+
+  @@index([equipmentId])
+  @@index([type])
+  @@index([method])
+  @@map("equipment_financial_operations")
 }
 
 model InventoryCheck {

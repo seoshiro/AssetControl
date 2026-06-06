@@ -4,6 +4,7 @@ import {
   ChartBar,
   ClipboardText,
   ClockCounterClockwise,
+  CurrencyCircleDollar,
   Database,
   HouseLine,
   Info,
@@ -12,6 +13,7 @@ import {
   ShieldCheck,
   SignOut,
   Toolbox,
+  Truck,
   UserCircle,
   UsersThree,
 } from '@phosphor-icons/react';
@@ -41,19 +43,20 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onNavigate, variant = 'desktop' }: SidebarProps) {
-  const { user, logout, isAdmin, canAudit, canViewReports } = useAuth();
+  const { user, logout, isAdmin, canAudit, canViewReports, canViewFinance, canViewRepairPickup } = useAuth();
 
   const roleLabel: Record<string, string> = {
     ADMIN: 'Администратор',
     MANAGER: 'Менеджер',
     INVENTORY_MANAGER: 'Инв. менеджер',
+    REPAIR_COORDINATOR: 'Координатор',
     EMPLOYEE: 'Сотрудник',
     AUDITOR: 'Аудитор',
     VIEWER: 'Наблюдатель',
   };
 
   return (
-    <aside className={`${variant === 'desktop' ? 'fixed left-0 top-0 min-h-screen w-64' : 'h-[calc(100vh-57px)] w-full'} flex flex-col border-r border-surface-200 bg-surface-50 text-surface-900`}>
+    <aside className={`${variant === 'desktop' ? 'fixed left-0 top-0 h-screen w-64' : 'h-[calc(100vh-57px)] w-full'} flex flex-col border-r border-surface-200 bg-surface-50 text-surface-900`}>
       <div className="border-b border-surface-200 p-6">
         <div className="font-display text-xl font-semibold leading-tight text-surface-950">AssetControl</div>
         <p className="mt-1 text-xs uppercase tracking-[0.18em] text-surface-500">equipment registry</p>
@@ -74,6 +77,20 @@ export default function Sidebar({ onNavigate, variant = 'desktop' }: SidebarProp
           <NavLink to="/audit-log" onClick={onNavigate} className={({ isActive }) => navClass(isActive)}>
             <ClockCounterClockwise className="h-4 w-4" weight="regular" />
             Audit log
+          </NavLink>
+        )}
+
+        {canViewFinance && (
+          <NavLink to="/finance" onClick={onNavigate} className={({ isActive }) => navClass(isActive)}>
+            <CurrencyCircleDollar className="h-4 w-4" weight="regular" />
+            Финансы
+          </NavLink>
+        )}
+
+        {canViewRepairPickup && (
+          <NavLink to="/repair-pickups" onClick={onNavigate} className={({ isActive }) => navClass(isActive)}>
+            <Truck className="h-4 w-4" weight="regular" />
+            Мои задачи ремонта
           </NavLink>
         )}
 

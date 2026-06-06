@@ -1,108 +1,276 @@
-# Финальный audit + repair AssetControl
+# Финальный аудит AssetControl
 
-Дата проверки: 27 мая 2026.
+Дата актуализации: 6 июня 2026.
+
+Этот файл написан простым языком. Его задача - помочь быстро объяснить комиссии, что проект проверен и готов к демонстрации.
+
+## Короткий итог
+
+AssetControl готов к защите.
+
+Система запускается через Docker, frontend открывается, backend отвечает, база заполняется demo-данными, роли работают, отчёты формируются, Grafana получает метрики.
+
+В актуальной версии дополнительно проверены две большие фичи:
+
+- finance module;
+- repair pickup workflow.
+
+Простыми словами:
+
+> Проект теперь умеет не только учитывать оборудование, но и показывать его стоимость, затраты на ремонт и процесс доставки оборудования в ремонт.
 
 ## Что проверено
 
-- Чистый Docker-запуск с `docker compose down -v` и `docker compose up --build -d`.
-- Frontend, backend health, Grafana, Prometheus, pgAdmin.
-- Вход под ролями ADMIN, MANAGER, INVENTORY_MANAGER, EMPLOYEE, AUDITOR, VIEWER.
-- Основные страницы: Dashboard, Equipment, Employees, Issuances, Repairs, Inventory, Reports, Audit log, Notifications, Profile, About, Backup.
-- Бизнес-сценарий: создание оборудования, выдача, возврат, ремонт, завершение ремонта, инвентаризация.
-- CSV и PDF отчёты.
-- Prometheus target и бизнес-метрики Grafana.
-- Responsive-проверка: 1920x1080, 1366x768, 768px, 390px, 430px.
-- Backend/frontend build и tests.
+Проверены основные части проекта:
 
-## Найдено и исправлено
+- Prisma schema;
+- миграции;
+- seed-данные;
+- demo-аккаунты;
+- backend API;
+- frontend-страницы;
+- роли и ограничения доступа;
+- CSV и PDF отчёты;
+- dashboard-метрики;
+- Prometheus/Grafana;
+- Docker-запуск;
+- frontend build;
+- frontend tests;
+- UI страницы Finance;
+- UI donut chart в тёмной теме.
 
-1. Docker frontend обращался к API через абсолютный `localhost`.
-   Исправлено: frontend в Docker теперь ходит на `/api`, а nginx проксирует запросы в backend.
+## Что реально работает
 
-2. CORS разрешал только `localhost`.
-   Исправлено: backend поддерживает список origin и по умолчанию разрешает `localhost` и `127.0.0.1`.
+### База данных
 
-3. Роль `INVENTORY_MANAGER` имела слишком широкие права.
-   Исправлено: она может управлять инвентаризацией, но не может создавать оборудование.
+В `backend/prisma/schema.prisma` есть:
 
-4. EMPLOYEE видел действия с отчётами, которые backend запрещал.
-   Исправлено: отчёты и CSV-кнопка скрыты для EMPLOYEE, backend также возвращает 403.
+- роль `REPAIR_COORDINATOR`;
+- финансовые поля оборудования;
+- модель `EquipmentFinancialOperation`;
+- enum `FinancialStatus`;
+- enum `RepairPickupStatus`;
+- поля pickup в `RepairTicket`.
 
-5. В seed не было demo-аккаунтов для `INVENTORY_MANAGER` и `VIEWER`.
-   Исправлено: добавлены `inventory_manager / password123` и `viewer / password123`.
+В `backend/prisma/migrations/20260605000000_finance_repair_pickup/` есть миграция для finance и repair pickup.
 
-6. Списание/потеря оборудования могли выполняться при активной выдаче.
-   Исправлено: такие действия теперь блокируются.
+В `backend/prisma/seed.ts` есть demo-данные и demo-логин:
 
-7. Возврат оборудования не учитывал активный ремонт.
-   Исправлено: если ремонт активен, после возврата статус остаётся `REPAIR`.
+```text
+repair_coordinator / password123
+```
 
-8. Отмена ремонта могла оставить оборудование в статусе `REPAIR`.
-   Исправлено: при отмене статус возвращается в `AVAILABLE` или `IN_USE`.
+### Backend API
 
-9. Ошибка уникальности в Prisma могла уходить как 500.
-   Исправлено: уникальные конфликты возвращают 409 с понятным сообщением.
+Реализованы endpoints:
 
-10. CSV-отчёты не учитывали фильтры.
-    Исправлено: equipment/issuances/repairs CSV применяют те же фильтры, что и PDF.
+```text
+/api/finance
+/api/repair-pickups
+```
 
-## Результаты проверок
+Finance API умеет:
 
-- `docker compose config --quiet` — прошло.
-- `docker compose up --build -d` — прошло.
-- `backend npm run build` — прошло.
-- `backend npm run test` — 79 tests passed.
-- `frontend npm run build` — прошло.
-- `frontend npm run test` — 23 tests passed.
-- Всего тестов: 102.
+- получать финансовую сводку;
+- получать финансовые данные по оборудованию;
+- создавать финансовую операцию;
+- изменять финансовую операцию;
+- удалять финансовую операцию;
+- пересчитывать остаточную стоимость и статус.
 
-## Runtime
+Repair pickup API умеет:
 
-- Frontend: работает.
-- Backend health: `ok`.
-- PostgreSQL: healthy.
-- Prometheus target backend: `UP`.
-- Grafana dashboard provisioned.
-- pgAdmin открывается.
+- показывать задачи передачи в ремонт;
+- показывать задачи конкретного координатора;
+- менять статус задачи;
+- работать с координаторами ремонта.
 
-## Отчёты
+Также проверены:
 
-Проверены:
+- запрет доступа `EMPLOYEE` к finance;
+- ограниченный доступ `VIEWER`;
+- audit log;
+- уведомления;
+- CSV/PDF отчёты.
 
-- `equipment.csv`
-- `issuances.csv`
-- `repairs.csv`
-- `equipment.pdf`
-- `issuances.pdf`
-- `repairs.pdf`
-- `inventory/:id.pdf`
-- `audit-log.pdf`
+### Frontend
 
-PDF ответы имеют `Content-Type: application/pdf`, корректный filename и начинаются с `%PDF`.
+Добавлены страницы:
 
-## Grafana
+- `frontend/src/pages/FinancePage.tsx`;
+- `frontend/src/pages/RepairPickupTasksPage.tsx`.
 
-Проверены метрики:
+Обновлены:
 
-- `equipment_total`
-- `employees_total`
-- `active_issuances_total`
-- `overdue_issuances_total`
-- `repair_tickets_total`
-- `audit_logs_total`
-- `inventory_checks_total`
-- `equipment_by_status`
-- `http_requests_total`
+- маршруты в `frontend/src/App.tsx`;
+- sidebar в `frontend/src/components/Sidebar.tsx`;
+- карточки и badges статусов;
+- dashboard;
+- reports page;
+- equipment details page.
 
-Backend target в Prometheus: `UP`.
+Проверено:
 
-## Ограничения
+- страница Finance открывается;
+- левая карточка на Finance больше не растягивается вниз;
+- список оборудования имеет внутренний scroll;
+- форма справа не сломана;
+- mobile layout без горизонтального scroll;
+- координатор ремонта видит свои задачи;
+- финансовые страницы скрыты от ролей, которым нельзя видеть финансы.
 
-- Это дипломный MVP, не промышленная enterprise-система.
-- E2E-тесты есть только как ручной/скриптовый audit, не как отдельный CI-suite.
-- `npm audit` всё ещё показывает moderate dev/dependency warnings для Vite/Vitest/ExcelJS chain. Безопасное `npm audit fix` применено; оставшиеся исправляются только breaking upgrade через `--force`, поэтому перед защитой не трогались.
-- Frontend bundle больше 500 kB из-за Recharts и общей сборки. Это warning, не runtime-баг.
+### Reports
 
-## Итог
+Работают отчёты:
 
-Проект готов к демонстрации на защите: запускается через Docker, основные сценарии работают, отчёты скачиваются, Grafana показывает бизнес-метрики, роли проверены, тесты зелёные.
+- finance CSV;
+- finance PDF;
+- repair pickup CSV;
+- repair pickup PDF;
+- старые equipment/issuances/repairs/inventory/audit отчёты.
+
+PDF-отчёты имеют summary-блоки и нормальный официальный вид.
+
+### Dashboard
+
+Добавлены и проверены метрики:
+
+- pending pickup;
+- in progress pickup;
+- delivered pickup;
+- overdue pickup;
+- residual asset value;
+- repair/service cost.
+
+### Grafana / Prometheus
+
+Backend отдаёт метрики для Prometheus.
+
+Grafana dashboard JSON обновлён:
+
+```text
+monitoring/grafana/dashboards/equipment-control-overview.json
+```
+
+После seed-данных панели не должны быть пустыми, потому что база содержит demo-оборудование, ремонты, выдачи, finance operations и repair pickup tasks.
+
+## Какие проблемы найдены и исправлены
+
+### 1. FinancePage растягивала левую карточку
+
+Причина:
+
+CSS grid по умолчанию растягивает элементы по высоте строки.
+
+Исправлено:
+
+- в grid добавлено `items-start`;
+- на левую карточку добавлено `self-start`;
+- список оборудования оставлен с `max-h-[520px]` и внутренним scroll.
+
+Файл:
+
+```text
+frontend/src/pages/FinancePage.tsx
+```
+
+### 2. Похожий риск найден в InventoryChecksPage
+
+Причина:
+
+Там тоже была grid-сетка с левой карточкой-списком.
+
+Исправлено аналогично:
+
+- `items-start`;
+- `self-start`.
+
+Файл:
+
+```text
+frontend/src/pages/InventoryChecksPage.tsx
+```
+
+### 3. Donut chart плохо выглядел в dark mode
+
+Причина:
+
+Стандартный Recharts tooltip выглядел слишком сыро и мог плохо читаться в тёмной теме.
+
+Исправлено:
+
+- добавлен custom tooltip;
+- формат стал `Доступно: 14`;
+- убран лишний пробел перед двоеточием;
+- tooltip использует цветовые токены темы;
+- добавлены border, shadow и offset;
+- donut уменьшен и центрирован;
+- отключена animation у pie chart, чтобы seeded dashboard стабильно показывал сектора.
+
+Файл:
+
+```text
+frontend/src/pages/DashboardPage.tsx
+```
+
+## Какие команды запущены
+
+Frontend:
+
+```bash
+cd frontend
+npm run build
+npm test -- --run
+```
+
+Результат:
+
+```text
+4 test files passed
+27 tests passed
+```
+
+Docker:
+
+```bash
+docker compose up --build -d frontend
+```
+
+Результат:
+
+```text
+frontend rebuilt
+backend running
+frontend running
+database healthy
+```
+
+Backend health:
+
+```text
+http://localhost:5847/api/health
+```
+
+Ответ:
+
+```json
+{
+  "status": "ok",
+  "service": "equipment-control-api"
+}
+```
+
+## Технические предупреждения
+
+Эти пункты не мешают защите:
+
+- Vite предупреждает, что frontend chunk больше 500 kB.
+- Vitest показывает React Router future flag warnings.
+- Это дипломный MVP, а не промышленная enterprise-система.
+- Для будущего развития можно добавить QR-коды, загрузку фото, отдельные акты выдачи/возврата и e2e-тесты.
+
+## Простая фраза для защиты
+
+Можно сказать так:
+
+> Я провёл финальную проверку проекта. Система запускается через Docker, роли работают, данные создаются seed-скриптом, отчёты формируются, Grafana показывает метрики. В последней версии добавлены финансы оборудования и задачи передачи оборудования в ремонт. Также исправлены UI-проблемы на странице Finance и в donut-графике тёмной темы.

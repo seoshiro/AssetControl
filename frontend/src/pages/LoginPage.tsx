@@ -29,6 +29,7 @@ export default function LoginPage() {
     { username: 'admin', role: 'ADMIN' },
     { username: 'manager', role: 'MANAGER' },
     { username: 'inventory_manager', role: 'INVENTORY_MANAGER' },
+    { username: 'repair_coordinator', role: 'REPAIR_COORDINATOR' },
     { username: 'employee', role: 'EMPLOYEE' },
     { username: 'auditor', role: 'AUDITOR' },
     { username: 'viewer', role: 'VIEWER' },

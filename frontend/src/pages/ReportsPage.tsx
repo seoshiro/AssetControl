@@ -74,6 +74,22 @@ export default function ReportsPage() {
       ],
     },
     {
+      title: 'Финансы оборудования',
+      description: 'Остаточная стоимость, износ, ремонтные затраты и дорогие в обслуживании активы.',
+      actions: [
+        { label: 'CSV', path: '/reports/finance.csv', filename: 'finance.csv', type: 'csv' },
+        { label: 'PDF', path: '/reports/finance.pdf', filename: `finance-report-${today()}.pdf`, type: 'pdf' },
+      ],
+    },
+    {
+      title: 'Передача в ремонт',
+      description: 'Кто забирает оборудование, куда доставляет, сроки и статусы передачи.',
+      actions: [
+        { label: 'CSV', path: '/reports/repair-pickups.csv', filename: 'repair-pickups.csv', type: 'csv' },
+        { label: 'PDF', path: '/reports/repair-pickups.pdf', filename: `repair-pickups-report-${today()}.pdf`, type: 'pdf' },
+      ],
+    },
+    {
       title: 'Demo-инвентаризация',
       description: 'Официальный акт проверки: найдено, отсутствует, перемещено, повреждено.',
       actions: [
@@ -102,7 +118,7 @@ export default function ReportsPage() {
           {visibleReports.length === 0 ? (
             <EmptyState title="Отчёты недоступны" description="Для этой роли глобальные отчёты скрыты. Обратитесь к администратору или аудитору." />
           ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {visibleReports.map((report) => (
               <section key={report.title} className="flex min-w-0 flex-col rounded-lg border border-surface-200 bg-surface-50 p-4">
                 <div className="min-h-[116px]">
