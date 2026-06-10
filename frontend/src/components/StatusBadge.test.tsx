@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import StatusBadge, { getStatusLabel, statusConfig } from './StatusBadge';
+import i18n from '../i18n';
 
 describe('StatusBadge', () => {
+  beforeEach(() => {
+    i18n.changeLanguage('ru');
+  });
+
   it('renders AVAILABLE in Russian', () => {
     render(<StatusBadge status="AVAILABLE" />);
     expect(screen.getByText('Доступно')).toBeInTheDocument();
@@ -48,5 +53,12 @@ describe('StatusBadge', () => {
     render(<StatusBadge status="DELIVERED" />);
     expect(screen.getByText('Доставлено')).toHaveClass('status-success');
     expect(getStatusLabel('PICKED_UP')).toBe('Забрано');
+  });
+
+  it('renders translated labels after switching to English', async () => {
+    await i18n.changeLanguage('en');
+    render(<StatusBadge status="AVAILABLE" />);
+    expect(screen.getByText('Available')).toBeInTheDocument();
+    expect(getStatusLabel('DONE')).toBe('Done');
   });
 });

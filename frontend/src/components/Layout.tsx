@@ -1,10 +1,13 @@
 import { Outlet } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { List, X } from '@phosphor-icons/react';
 import Sidebar from './Sidebar';
+import LanguageSwitcher from './LanguageSwitcher';
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     document.body.style.overflow = drawerOpen ? 'hidden' : '';
@@ -23,14 +26,14 @@ export default function Layout() {
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
-            aria-label="Закрыть меню по фону"
+            aria-label={t('nav.closeMenuBackdrop')}
             className="absolute inset-0 bg-surface-950/35"
             onClick={() => setDrawerOpen(false)}
           />
           <div className="absolute inset-y-0 left-0 w-[min(82vw,18rem)] bg-surface-50 shadow-raised">
             <div className="flex items-center justify-between border-b border-surface-200 px-4 py-3">
               <span className="font-display text-lg font-semibold text-surface-950">AssetControl</span>
-              <button className="icon-button icon-button-sm" onClick={() => setDrawerOpen(false)} aria-label="Закрыть меню">
+              <button className="icon-button icon-button-sm" onClick={() => setDrawerOpen(false)} aria-label={t('nav.closeMenu')}>
                 <X className="h-5 w-5" weight="regular" />
               </button>
             </div>
@@ -45,14 +48,15 @@ export default function Layout() {
             type="button"
             className="icon-button icon-button-sm lg:hidden"
             onClick={() => setDrawerOpen(true)}
-            aria-label="Открыть меню"
+            aria-label={t('nav.openMenu')}
           >
             <List className="h-5 w-5" weight="regular" />
           </button>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-surface-500">AssetControl workspace</p>
-            <p className="truncate text-sm text-surface-700">Локальная демонстрация учёта и контроля оборудования</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-surface-500">{t('common.workspace')}</p>
+            <p className="truncate text-sm text-surface-700">{t('common.workspaceDescription')}</p>
           </div>
+          <LanguageSwitcher compact />
         </div>
         <Outlet />
       </main>

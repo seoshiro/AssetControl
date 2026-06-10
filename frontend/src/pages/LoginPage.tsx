@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Archive, FileText, ShieldCheck, Pulse } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { ErrorState, RoleBadge } from '../components/ui';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('admin');
@@ -11,6 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const signIn = async (user = username, pass = password) => {
     setError('');
@@ -19,7 +22,7 @@ export default function LoginPage() {
       await login(user, pass);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка авторизации');
+      setError(err.response?.data?.error || t('login.authError'));
     } finally {
       setLoading(false);
     }
@@ -41,23 +44,26 @@ export default function LoginPage() {
         <div className="flex items-center gap-3">
           <div>
             <div className="font-display text-2xl font-semibold">AssetControl</div>
-            <p className="text-xs uppercase tracking-[0.18em] text-surface-500">enterprise equipment registry</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-surface-500">{t('common.enterpriseRegistry')}</p>
+          </div>
+          <div className="ml-auto xl:hidden">
+            <LanguageSwitcher compact />
           </div>
         </div>
 
         <div className="max-w-3xl py-12">
-          <p className="section-title mb-4">internal operations system</p>
+          <p className="section-title mb-4">{t('login.section')}</p>
           <h1 className="max-w-3xl font-display text-4xl font-semibold leading-tight text-surface-950 xl:text-6xl">
-            Учёт и контроль оборудования предприятия
+            {t('login.title')}
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-surface-600">
-            Dashboard, выдачи, ремонты, инвентаризация, audit log, уведомления и отчёты в одном локальном MVP для защиты диплома.
+            {t('login.subtitle')}
           </p>
           <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
             {[
-              ['RBAC', 'контроль ролей', ShieldCheck],
-              ['Audit', 'история действий', FileText],
-              ['Assets', 'баланс и движение', Archive],
+              [t('login.rbacTitle'), t('login.rbac'), ShieldCheck],
+              [t('login.auditTitle'), t('login.audit'), FileText],
+              [t('login.assetsTitle'), t('login.assets'), Archive],
             ].map(([title, desc, Icon]) => (
               <div key={title as string} className="rounded-lg border border-surface-200 bg-surface-50 p-4 shadow-panel">
                 <Icon className="mb-3 h-5 w-5 text-primary-700" weight="regular" />
@@ -70,23 +76,26 @@ export default function LoginPage() {
 
         <div className="flex items-center gap-2 text-xs text-surface-500">
           <Pulse className="h-4 w-4 text-primary-700" weight="regular" />
-          Локальная демонстрация: frontend 6347, API 5847
+          {t('login.demoPorts')}
         </div>
       </section>
 
       <aside className="flex items-center border-l border-surface-200 bg-surface-100 p-6 xl:p-10">
         <div className="w-full rounded-xl border border-surface-200 bg-surface-50 p-6 shadow-raised">
-          <p className="section-title mb-3">secure access</p>
-          <h2 className="text-2xl font-extrabold">Вход в систему</h2>
-          <p className="mt-2 text-sm text-surface-500">Demo-доступ для комиссии и проверки ролей.</p>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <p className="section-title">{t('login.access')}</p>
+            <LanguageSwitcher compact />
+          </div>
+          <h2 className="text-2xl font-extrabold">{t('login.formTitle')}</h2>
+          <p className="mt-2 text-sm text-surface-500">{t('login.formSubtitle')}</p>
           <form onSubmit={(e) => { e.preventDefault(); signIn(); }} className="space-y-4 mt-6">
             {error && <ErrorState message={error} />}
-            <label className="block"><span className="label">Логин</span><input className="input" value={username} onChange={(e) => setUsername(e.target.value)} /></label>
-            <label className="block"><span className="label">Пароль</span><input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-            <button className="btn-primary w-full" disabled={loading}>{loading ? 'Вход...' : 'Войти'}</button>
+            <label className="block"><span className="label">{t('common.username')}</span><input className="input" value={username} onChange={(e) => setUsername(e.target.value)} /></label>
+            <label className="block"><span className="label">{t('common.password')}</span><input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+            <button className="btn-primary w-full" disabled={loading}>{loading ? t('login.signingIn') : t('login.signIn')}</button>
           </form>
           <div className="mt-6">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-surface-500">Быстрый вход</p>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-surface-500">{t('login.quickLogin')}</p>
             <div className="grid grid-cols-2 gap-2">
               {demo.map((account) => (
                 <button key={account.username} className="btn-secondary justify-between" onClick={() => signIn(account.username, 'password123')}>

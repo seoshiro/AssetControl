@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type BaseProps = {
   children: ReactNode;
@@ -23,10 +24,12 @@ type PageHeaderProps = {
 };
 
 export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <header className={cx('flex min-w-0 flex-col gap-3 border-b border-surface-200/80 pb-5 sm:flex-row sm:items-end sm:justify-between', className)}>
       <div className="min-w-0">
-        <p className="section-title mb-2">control panel</p>
+        <p className="section-title mb-2">{t('common.controlPanel')}</p>
         <h1 className="page-title truncate">{title}</h1>
         {description && <p className="mt-2 max-w-2xl text-sm leading-6 text-surface-600">{description}</p>}
       </div>

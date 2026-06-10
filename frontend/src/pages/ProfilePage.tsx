@@ -1,32 +1,25 @@
 import { Monitor, Moon, SignOut, Sun, UserCircle } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { ThemeMode, useTheme } from '../context/ThemeContext';
 import { ContentCard, PageContainer, PageHeader } from '../components/PageLayout';
 import { RoleBadge } from '../components/ui';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
-const roleDescriptions: Record<string, string> = {
-  ADMIN: 'Полный доступ к системе, пользователям, отчётам, audit log и критичным операциям.',
-  MANAGER: 'Управление оборудованием, выдачами, ремонтами, инвентаризациями и отчётами.',
-  INVENTORY_MANAGER: 'Операционный учёт оборудования, инвентаризации, выдачи и ремонтные заявки.',
-  REPAIR_COORDINATOR: 'Передача оборудования в ремонт: забрать, доставить и отметить статус задачи.',
-  EMPLOYEE: 'Просмотр собственных данных, уведомлений и закреплённого оборудования.',
-  AUDITOR: 'Просмотр отчётов, истории действий и audit log без изменения данных.',
-  VIEWER: 'Ограниченный режим просмотра для демонстрации и контроля.',
-};
-
-const themeOptions: Array<{ mode: ThemeMode; label: string; icon: typeof Sun }> = [
-  { mode: 'light', label: 'Light', icon: Sun },
-  { mode: 'dark', label: 'Dark', icon: Moon },
-  { mode: 'system', label: 'System', icon: Monitor },
+const themeOptions: Array<{ mode: ThemeMode; icon: typeof Sun }> = [
+  { mode: 'light', icon: Sun },
+  { mode: 'dark', icon: Moon },
+  { mode: 'system', icon: Monitor },
 ];
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const { mode, resolvedTheme, setMode } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <PageContainer>
-      <PageHeader title="Профиль" description="Данные активной сессии, роль и персональные настройки интерфейса." />
+      <PageHeader title={t('profile.title')} description={t('profile.description')} />
 
       <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <ContentCard>
@@ -36,7 +29,7 @@ export default function ProfilePage() {
             </div>
             <div className="min-w-0">
               <h2 className="truncate font-display text-2xl font-semibold text-surface-950">{user?.username}</h2>
-              <p className="mt-1 truncate text-sm text-surface-600">{user?.email || `login: ${user?.username}`}</p>
+              <p className="mt-1 truncate text-sm text-surface-600">{user?.email || t('profile.loginFallback', { username: user?.username })}</p>
               <div className="mt-3">
                 <RoleBadge role={user?.role} />
               </div>
@@ -45,26 +38,29 @@ export default function ProfilePage() {
 
           <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="rounded-lg border border-surface-200 bg-surface-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-500">Роль</p>
-              <p className="mt-2 text-sm text-surface-700">{roleDescriptions[user?.role || ''] || 'Права доступа определяются ролью пользователя.'}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-500">{t('common.role')}</p>
+              <p className="mt-2 text-sm text-surface-700">{t(`roleDescription.${user?.role || 'fallback'}`, { defaultValue: t('roleDescription.fallback') })}</p>
             </div>
             <div className="rounded-lg border border-surface-200 bg-surface-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-500">Активная сессия</p>
-              <p className="mt-2 text-sm text-surface-700">Demo-аккаунт работает через JWT и локальное хранилище браузера.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-500">{t('profile.activeSession')}</p>
+              <p className="mt-2 text-sm text-surface-700">{t('profile.sessionText')}</p>
             </div>
           </div>
 
           <button type="button" onClick={logout} className="btn-secondary mt-6">
             <SignOut className="h-4 w-4" weight="regular" />
-            Выйти из системы
+            {t('profile.logoutSystem')}
           </button>
         </ContentCard>
 
-        <ContentCard>
-          <h2 className="text-base font-semibold text-surface-950">Настройки интерфейса</h2>
-          <p className="mt-1 text-sm text-surface-500">Тема сохраняется локально и применяется после перезагрузки.</p>
+        <ContentCard className="space-y-6">
+          <div>
+            <h2 className="text-base font-semibold text-surface-950">{t('profile.settings')}</h2>
+            <p className="mt-1 text-sm text-surface-500">{t('profile.themeDescription')}</p>
+          </div>
 
-          <div className="mt-5 space-y-2">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-500">{t('profile.theme')}</p>
             {themeOptions.map((option) => {
               const Icon = option.icon;
               const active = mode === option.mode;
@@ -81,15 +77,20 @@ export default function ProfilePage() {
                 >
                   <span className="flex items-center gap-2">
                     <Icon className="h-4 w-4" weight="regular" />
-                    {option.label}
+                    {t(`theme.${option.mode}`)}
                   </span>
-                  {active && <span className="text-xs text-surface-500">активно</span>}
+                  {active && <span className="text-xs text-surface-500">{t('common.active')}</span>}
                 </button>
               );
             })}
           </div>
 
-          <p className="mt-4 text-xs text-surface-500">Сейчас применяется: {resolvedTheme === 'dark' ? 'Dark' : 'Light'}.</p>
+          <p className="text-xs text-surface-500">{t('profile.currentTheme', { theme: t(`theme.${resolvedTheme}`) })}</p>
+
+          <div>
+            <LanguageSwitcher />
+            <p className="mt-2 text-sm text-surface-500">{t('profile.languageDescription')}</p>
+          </div>
         </ContentCard>
       </div>
     </PageContainer>

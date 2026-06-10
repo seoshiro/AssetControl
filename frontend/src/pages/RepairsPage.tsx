@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from '@phosphor-icons/react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import StatusBadge from '../components/StatusBadge';
 import { ContentCard, PageContainer, PageHeader, ScrollArea } from '../components/PageLayout';
+import { formatDate } from '../i18n/format';
 
 export default function RepairsPage() {
+  const { t } = useTranslation();
+  const defaultRepairResult = t('repairsPage.defaultResult');
   const [params] = useSearchParams();
   const [repairs, setRepairs] = useState<any[]>([]);
   const [equipment, setEquipment] = useState<any[]>([]);
@@ -14,7 +18,7 @@ export default function RepairsPage() {
   const [coordinators, setCoordinators] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(Boolean(params.get('equipmentId')));
   const [completeDialog, setCompleteDialog] = useState<any | null>(null);
-  const [completeForm, setCompleteForm] = useState({ result: 'Ремонт выполнен', cost: '0' });
+  const [completeForm, setCompleteForm] = useState({ result: defaultRepairResult, cost: '0' });
   const [savingComplete, setSavingComplete] = useState(false);
   const [form, setForm] = useState({
     equipmentId: params.get('equipmentId') || '',
@@ -73,11 +77,11 @@ export default function RepairsPage() {
     setSavingComplete(true);
     try {
       await api.put(`/repairs/${completeDialog.id}/complete`, {
-        result: completeForm.result.trim() || 'Ремонт выполнен',
+        result: completeForm.result.trim() || defaultRepairResult,
         cost: Number(completeForm.cost || 0),
       });
       setCompleteDialog(null);
-      setCompleteForm({ result: 'Ремонт выполнен', cost: '0' });
+      setCompleteForm({ result: defaultRepairResult, cost: '0' });
       await fetchData();
     } finally {
       setSavingComplete(false);
@@ -92,32 +96,32 @@ export default function RepairsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Ремонтные заявки"
-        description="Контроль неисправностей, приоритетов и стоимости ремонта."
-        actions={canManage && <button className="btn-primary" onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4" weight="regular" /> Заявка</button>}
+        title={t('repairsPage.title')}
+        description={t('repairsPage.description')}
+        actions={canManage && <button className="btn-primary" onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4" weight="regular" /> {t('repairsPage.ticket')}</button>}
       />
 
       {showForm && (
         <ContentCard>
           <form onSubmit={createRepair} className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <select className="input" value={form.equipmentId} onChange={(e) => setForm({ ...form, equipmentId: e.target.value })} required><option value="">Оборудование</option>{equipment.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.inventoryNumber}</option>)}</select>
-            <select className="input" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select>
-            <input className="input" placeholder="Причина обращения" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required />
+            <select className="input" value={form.equipmentId} onChange={(e) => setForm({ ...form, equipmentId: e.target.value })} required><option value="">{t('issuances.equipment')}</option>{equipment.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.inventoryNumber}</option>)}</select>
+            <select className="input" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((priority) => <option key={priority} value={priority}>{t(`status.${priority}`)}</option>)}</select>
+            <input className="input" placeholder={t('repairsPage.reasonPlaceholder')} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required />
             <select className="input" value={form.assignedCoordinatorId} onChange={(e) => setForm({ ...form, assignedCoordinatorId: e.target.value })}>
-              <option value="">Координатор ремонта</option>
+              <option value="">{t('repairsPage.repairCoordinator')}</option>
               {coordinators.map((item) => <option key={item.id} value={item.id}>{item.username}</option>)}
             </select>
             <select className="input" value={form.pickupLocationId} onChange={(e) => setForm({ ...form, pickupLocationId: e.target.value })}>
-              <option value="">Откуда забрать</option>
+              <option value="">{t('repairsPage.pickupFrom')}</option>
               {locations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
             <select className="input" value={form.destinationLocationId} onChange={(e) => setForm({ ...form, destinationLocationId: e.target.value })}>
-              <option value="">Куда доставить</option>
+              <option value="">{t('repairsPage.deliverTo')}</option>
               {locations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
             <input className="input" type="date" value={form.pickupDueDate} onChange={(e) => setForm({ ...form, pickupDueDate: e.target.value })} />
-            <input className="input" placeholder="Комментарий к передаче" value={form.pickupComment} onChange={(e) => setForm({ ...form, pickupComment: e.target.value })} />
-            <button className="btn-success">Создать</button>
+            <input className="input" placeholder={t('repairsPage.pickupComment')} value={form.pickupComment} onChange={(e) => setForm({ ...form, pickupComment: e.target.value })} />
+            <button className="btn-success">{t('common.create')}</button>
           </form>
         </ContentCard>
       )}
@@ -130,30 +134,28 @@ export default function RepairsPage() {
             <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-extrabold">{row.equipment.name}</h2><p className="truncate font-mono text-xs text-surface-500">{row.equipment.inventoryNumber}</p></div><StatusBadge status={row.status} /></div>
             <p className="mt-3 break-words text-sm">{row.reason}</p>
             <div className="mt-3 flex items-center justify-between text-xs text-surface-500">
-              <span>Приоритет: <b className="text-surface-900">{row.priority}</b></span>
-              <span>{new Date(row.createdAt).toLocaleDateString('ru-RU')}</span>
+              <span>{t('repairsPage.priority')} <b className="text-surface-900">{t(`status.${row.priority}`)}</b></span>
+              <span>{formatDate(row.createdAt)}</span>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-surface-500 md:grid-cols-2">
-              <span>Передача: <StatusBadge status={row.pickupStatus || 'PENDING'} /></span>
-              <span className="truncate">Координатор: <b className="text-surface-900">{row.assignedCoordinator?.username || 'не назначен'}</b></span>
-              <span className="truncate">Откуда: <b className="text-surface-900">{row.pickupLocation?.name || row.equipment.location?.name || 'не указано'}</b></span>
-              <span className="truncate">Куда: <b className="text-surface-900">{row.destinationLocation?.name || 'не указано'}</b></span>
+              <span>{t('equipment.pickup')} <StatusBadge status={row.pickupStatus || 'PENDING'} /></span>
+              <span className="truncate">{t('repairPickup.coordinator')}: <b className="text-surface-900">{row.assignedCoordinator?.username || t('common.notAssigned')}</b></span>
+              <span className="truncate">{t('repairsPage.pickupFrom')}: <b className="text-surface-900">{row.pickupLocation?.name || row.equipment.location?.name || t('common.notSpecified')}</b></span>
+              <span className="truncate">{t('repairsPage.deliverTo')}: <b className="text-surface-900">{row.destinationLocation?.name || t('common.notSpecified')}</b></span>
             </div>
             {canManage && row.status !== 'DONE' && row.status !== 'CANCELLED' && (
               <div className="mt-4 flex flex-wrap gap-2">
                 <select className="input max-w-[180px]" value={row.status} onChange={(e) => changeStatus(row.id, e.target.value)}>
-                  <option value="OPEN">OPEN</option>
-                  <option value="IN_PROGRESS">IN_PROGRESS</option>
-                  <option value="CANCELLED">CANCELLED</option>
+                  {['OPEN', 'IN_PROGRESS', 'CANCELLED'].map((status) => <option key={status} value={status}>{t(`status.${status}`)}</option>)}
                 </select>
                 <button
                   className="btn-secondary"
                   onClick={() => {
                     setCompleteDialog(row);
-                    setCompleteForm({ result: row.result || 'Ремонт выполнен', cost: String(row.cost || 0) });
+                    setCompleteForm({ result: row.result || defaultRepairResult, cost: String(row.cost || 0) });
                   }}
                 >
-                  Завершить ремонт
+                  {t('repairsPage.completeRepair')}
                 </button>
               </div>
             )}
@@ -166,11 +168,11 @@ export default function RepairsPage() {
       {completeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/45 p-4">
           <form onSubmit={submitComplete} className="w-full max-w-lg rounded-lg border border-surface-200 bg-surface-50 p-5 shadow-raised">
-            <p className="section-title">Завершение ремонта</p>
+            <p className="section-title">{t('repairsPage.completion')}</p>
             <h2 className="mt-2 text-lg font-extrabold text-surface-950">{completeDialog.equipment.name}</h2>
             <p className="mt-1 font-mono text-xs text-surface-500">{completeDialog.equipment.inventoryNumber}</p>
 
-            <label className="label mt-5" htmlFor="repair-complete-result">Результат ремонта</label>
+            <label className="label mt-5" htmlFor="repair-complete-result">{t('repairsPage.result')}</label>
             <textarea
               id="repair-complete-result"
               className="input min-h-[112px] resize-y"
@@ -179,7 +181,7 @@ export default function RepairsPage() {
               required
             />
 
-            <label className="label mt-3" htmlFor="repair-complete-cost">Стоимость</label>
+            <label className="label mt-3" htmlFor="repair-complete-cost">{t('repairsPage.cost')}</label>
             <input
               id="repair-complete-cost"
               className="input"
@@ -192,10 +194,10 @@ export default function RepairsPage() {
 
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button type="button" className="btn-secondary" disabled={savingComplete} onClick={() => setCompleteDialog(null)}>
-                Отмена
+                {t('common.cancel')}
               </button>
               <button type="submit" className="btn-primary" disabled={savingComplete}>
-                {savingComplete ? 'Сохранение...' : 'Подтвердить завершение'}
+                {savingComplete ? t('common.saving') : t('repairsPage.confirmCompletion')}
               </button>
             </div>
           </form>

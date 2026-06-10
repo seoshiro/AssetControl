@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MagnifyingGlass } from '@phosphor-icons/react';
 
 type BaseProps = {
@@ -83,19 +84,11 @@ export function FilterBar({ children, className }: BaseProps) {
 }
 
 export function RoleBadge({ role }: { role?: string | null }) {
-  const label: Record<string, string> = {
-    ADMIN: 'ADMIN',
-    MANAGER: 'MANAGER',
-    INVENTORY_MANAGER: 'INVENTORY',
-    REPAIR_COORDINATOR: 'REPAIR',
-    EMPLOYEE: 'EMPLOYEE',
-    AUDITOR: 'AUDITOR',
-    VIEWER: 'VIEWER',
-  };
+  const { t } = useTranslation();
 
   return (
-    <span className="inline-flex items-center rounded-md border border-primary-200 bg-primary-50 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-800">
-      {label[role || ''] || role || 'USER'}
+    <span className="inline-flex max-w-full items-center rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary-800">
+      <span className="truncate">{t(`role.${role || 'USER'}`, { defaultValue: role || t('role.USER') })}</span>
     </span>
   );
 }
@@ -109,10 +102,12 @@ export function EmptyState({ title, description }: { title: string; description?
   );
 }
 
-export function LoadingState({ label = 'Загрузка данных' }: { label?: string }) {
+export function LoadingState({ label }: { label?: string }) {
+  const { t } = useTranslation();
+
   return (
     <div className="card space-y-3">
-      <p className="text-sm font-semibold text-surface-700">{label}</p>
+      <p className="text-sm font-semibold text-surface-700">{label || t('common.loadingData')}</p>
       <div className="h-3 rounded bg-surface-200" />
       <div className="h-3 w-2/3 rounded bg-surface-200" />
       <div className="h-3 w-1/2 rounded bg-surface-200" />

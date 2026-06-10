@@ -1,16 +1,38 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmptyState, ErrorState, LoadingState, RoleBadge, SearchInput, StatCard } from './ui';
+import { PageHeader } from './PageLayout';
+import i18n from '../i18n';
 
 describe('shared UI components', () => {
-  it('shows INVENTORY_MANAGER as compact inventory role', () => {
+  beforeEach(() => {
+    i18n.changeLanguage('ru');
+  });
+
+  it('translates INVENTORY_MANAGER role instead of exposing a raw enum', () => {
     render(<RoleBadge role="INVENTORY_MANAGER" />);
-    expect(screen.getByText('INVENTORY')).toBeInTheDocument();
+    expect(screen.getByText('Инв. менеджер')).toBeInTheDocument();
+    expect(screen.queryByText('INVENTORY_MANAGER')).not.toBeInTheDocument();
   });
 
   it('falls back to USER when role is empty', () => {
     render(<RoleBadge role={null} />);
-    expect(screen.getByText('USER')).toBeInTheDocument();
+    expect(screen.getByText('Пользователь')).toBeInTheDocument();
+  });
+
+  it('translates role badge labels in English', async () => {
+    await i18n.changeLanguage('en');
+    render(<RoleBadge role="REPAIR_COORDINATOR" />);
+    expect(screen.getByText('Repair coordinator')).toBeInTheDocument();
+  });
+
+  it('renders PageHeader section label through i18n', async () => {
+    const { rerender } = render(<PageHeader title="Demo" />);
+    expect(screen.getByText('панель управления')).toBeInTheDocument();
+
+    await i18n.changeLanguage('en');
+    rerender(<PageHeader title="Demo" />);
+    expect(screen.getByText('control panel')).toBeInTheDocument();
   });
 
   it('renders empty state title and description', () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
 import { ContentCard, PageContainer, PageHeader } from '../components/PageLayout';
 import { ErrorState } from '../components/ui';
@@ -8,6 +9,7 @@ export default function EmployeeFormPage() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [form, setForm] = useState({
     fullName: '',
@@ -47,7 +49,7 @@ export default function EmployeeFormPage() {
       }
       navigate('/employees');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка сохранения');
+      setError(err.response?.data?.error || t('equipment.saveError'));
     } finally {
       setLoading(false);
     }
@@ -59,7 +61,7 @@ export default function EmployeeFormPage() {
 
   return (
     <PageContainer>
-      <PageHeader title={isEdit ? 'Редактировать сотрудника' : 'Новый сотрудник'} description="Профиль сотрудника для закрепления оборудования и истории выдач." />
+      <PageHeader title={isEdit ? t('employees.formEdit') : t('employees.formNew')} description={t('employees.formDescription')} />
 
       <div className="max-w-2xl">
         <ContentCard>
@@ -67,13 +69,13 @@ export default function EmployeeFormPage() {
             {error && <ErrorState message={error} />}
 
             <div>
-              <label htmlFor="fullName" className="label">ФИО *</label>
+              <label htmlFor="fullName" className="label">{t('employees.fullName')} *</label>
               <input
                 id="fullName"
                 name="fullName"
                 type="text"
                 className="input"
-                placeholder="Иванов Иван Иванович"
+                placeholder={t('employees.fullNamePlaceholder')}
                 value={form.fullName}
                 onChange={handleChange}
                 required
@@ -81,24 +83,24 @@ export default function EmployeeFormPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="email" className="label">Email</label>
+                <label htmlFor="email" className="label">{t('common.email')}</label>
                 <input id="email" name="email" type="email" className="input" value={form.email} onChange={handleChange} />
               </div>
               <div>
-                <label htmlFor="phone" className="label">Телефон</label>
+                <label htmlFor="phone" className="label">{t('employees.phone')}</label>
                 <input id="phone" name="phone" type="text" className="input" value={form.phone} onChange={handleChange} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="department" className="label">Отдел *</label>
+                <label htmlFor="department" className="label">{t('employees.department')} *</label>
                 <input
                   id="department"
                   name="department"
                   type="text"
                   className="input"
-                  placeholder="IT отдел"
+                  placeholder={t('employees.departmentPlaceholder')}
                   value={form.department}
                   onChange={handleChange}
                   required
@@ -106,13 +108,13 @@ export default function EmployeeFormPage() {
               </div>
 
               <div>
-                <label htmlFor="position" className="label">Должность *</label>
+                <label htmlFor="position" className="label">{t('employees.position')} *</label>
                 <input
                   id="position"
                   name="position"
                   type="text"
                   className="input"
-                  placeholder="Разработчик"
+                  placeholder={t('employees.positionPlaceholder')}
                   value={form.position}
                   onChange={handleChange}
                   required
@@ -122,14 +124,14 @@ export default function EmployeeFormPage() {
 
             <div className="flex items-center gap-3 pt-2">
               <button type="submit" disabled={loading} className="btn-primary">
-                {loading ? 'Сохранение...' : isEdit ? 'Сохранить' : 'Создать'}
+                {loading ? t('common.saving') : isEdit ? t('common.save') : t('common.create')}
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/employees')}
                 className="btn-secondary"
               >
-                Отмена
+                {t('common.cancel')}
               </button>
             </div>
           </form>

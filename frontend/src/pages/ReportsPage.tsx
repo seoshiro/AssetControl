@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DownloadSimple, FilePdf } from '@phosphor-icons/react';
 import api from '../api/axios';
 import { ContentCard, PageContainer, PageHeader, ScrollArea } from '../components/PageLayout';
@@ -23,6 +24,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ReportsPage() {
   const { canAudit, canViewReports } = useAuth();
+  const { t } = useTranslation();
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -42,7 +44,7 @@ export default function ReportsPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      setError('Не удалось скачать отчёт. Проверьте права доступа или повторите попытку.');
+      setError(t('reports.downloadError'));
     } finally {
       setLoadingKey(null);
     }
@@ -50,56 +52,56 @@ export default function ReportsPage() {
 
   const reports: ReportCard[] = [
     {
-      title: 'Сводный реестр оборудования',
-      description: 'Инвентарная ведомость активов: статусы, владельцы, локации, стоимость и гарантия.',
+      title: t('reports.equipmentTitle'),
+      description: t('reports.equipmentDescription'),
       actions: [
         { label: 'CSV', path: '/reports/equipment.csv', filename: 'equipment.csv', type: 'csv' },
         { label: 'PDF', path: '/reports/equipment.pdf', filename: `equipment-report-${today()}.pdf`, type: 'pdf' },
       ],
     },
     {
-      title: 'История выдач',
-      description: 'Движение оборудования по сотрудникам: активные, возвращённые и просроченные выдачи.',
+      title: t('reports.issuancesTitle'),
+      description: t('reports.issuancesDescription'),
       actions: [
         { label: 'CSV', path: '/reports/issuances.csv', filename: 'issuances.csv', type: 'csv' },
         { label: 'PDF', path: '/reports/issuances.pdf', filename: `issuances-report-${today()}.pdf`, type: 'pdf' },
       ],
     },
     {
-      title: 'Ремонтные заявки',
-      description: 'Техническое обслуживание: причины, приоритеты, статусы, стоимость и результаты.',
+      title: t('reports.repairsTitle'),
+      description: t('reports.repairsDescription'),
       actions: [
         { label: 'CSV', path: '/reports/repairs.csv', filename: 'repairs.csv', type: 'csv' },
         { label: 'PDF', path: '/reports/repairs.pdf', filename: `repairs-report-${today()}.pdf`, type: 'pdf' },
       ],
     },
     {
-      title: 'Финансы оборудования',
-      description: 'Остаточная стоимость, износ, ремонтные затраты и дорогие в обслуживании активы.',
+      title: t('reports.financeTitle'),
+      description: t('reports.financeDescription'),
       actions: [
         { label: 'CSV', path: '/reports/finance.csv', filename: 'finance.csv', type: 'csv' },
         { label: 'PDF', path: '/reports/finance.pdf', filename: `finance-report-${today()}.pdf`, type: 'pdf' },
       ],
     },
     {
-      title: 'Передача в ремонт',
-      description: 'Кто забирает оборудование, куда доставляет, сроки и статусы передачи.',
+      title: t('reports.pickupTitle'),
+      description: t('reports.pickupDescription'),
       actions: [
         { label: 'CSV', path: '/reports/repair-pickups.csv', filename: 'repair-pickups.csv', type: 'csv' },
         { label: 'PDF', path: '/reports/repair-pickups.pdf', filename: `repair-pickups-report-${today()}.pdf`, type: 'pdf' },
       ],
     },
     {
-      title: 'Demo-инвентаризация',
-      description: 'Официальный акт проверки: найдено, отсутствует, перемещено, повреждено.',
+      title: t('reports.inventoryTitle'),
+      description: t('reports.inventoryDescription'),
       actions: [
         { label: 'CSV', path: '/reports/inventory/1.csv', filename: 'inventory-1.csv', type: 'csv' },
         { label: 'PDF', path: '/reports/inventory/1.pdf', filename: `inventory-check-1-${today()}.pdf`, type: 'pdf' },
       ],
     },
     {
-      title: 'Audit log',
-      description: 'Журнал действий пользователей и системных событий для аудитора.',
+      title: t('reports.auditTitle'),
+      description: t('reports.auditDescription'),
       auditOnly: true,
       actions: [
         { label: 'PDF', path: '/reports/audit-log.pdf', filename: `audit-log-report-${today()}.pdf`, type: 'pdf' },
@@ -111,12 +113,12 @@ export default function ReportsPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Отчёты и экспорт" description="CSV для Excel и PDF для официального представления, печати и защиты проекта." />
+      <PageHeader title={t('reports.title')} description={t('reports.description')} />
       {error && <ErrorState message={error} />}
       <ContentCard>
         <ScrollArea className="max-h-[70vh]">
           {visibleReports.length === 0 ? (
-            <EmptyState title="Отчёты недоступны" description="Для этой роли глобальные отчёты скрыты. Обратитесь к администратору или аудитору." />
+            <EmptyState title={t('reports.unavailableTitle')} description={t('reports.unavailableDescription')} />
           ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {visibleReports.map((report) => (
@@ -138,7 +140,7 @@ export default function ReportsPage() {
                         onClick={() => download(action)}
                       >
                         <Icon className="h-4 w-4" weight="regular" />
-                        {busy ? 'Скачивание...' : `${action.label}`}
+                        {busy ? t('common.downloading') : `${action.label}`}
                       </button>
                     );
                   })}

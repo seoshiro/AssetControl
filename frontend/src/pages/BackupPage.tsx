@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
 import { PageContainer, PageHeader } from '../components/PageLayout';
 import { ErrorState } from '../components/ui';
 
 export default function BackupPage() {
+  const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -23,7 +25,7 @@ export default function BackupPage() {
       link.click();
       link.parentNode?.removeChild(link);
     } catch (err) {
-      setError('Ошибка при скачивании бэкапа');
+      setError(t('backup.downloadError'));
     }
   };
 
@@ -31,7 +33,7 @@ export default function BackupPage() {
     e.preventDefault();
     if (!file) return;
 
-    if (!confirm('ВНИМАНИЕ! Текущая база данных будет перезаписана данными из файла. Продолжить?')) {
+    if (!confirm(t('backup.restoreConfirm'))) {
       return;
     }
 
@@ -46,10 +48,10 @@ export default function BackupPage() {
       const res = await api.post('/backup/restore', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setMessage(res.data.message || 'Восстановление прошло успешно!');
+      setMessage(res.data.message || t('backup.restoreSuccess'));
       setFile(null);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка при восстановлении базы данных');
+      setError(err.response?.data?.error || t('backup.restoreError'));
     } finally {
       setLoading(false);
     }
@@ -57,7 +59,7 @@ export default function BackupPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Резервное копирование" description="Административный экспорт и восстановление базы данных." />
+      <PageHeader title={t('backup.title')} description={t('backup.description')} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Export card */}
@@ -68,13 +70,13 @@ export default function BackupPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-surface-950">Создать копию</h2>
+            <h2 className="text-xl font-semibold text-surface-950">{t('backup.createCopy')}</h2>
           </div>
           <p className="text-surface-600 mb-6 text-sm">
-            Скачайте полную копию базы данных в формате SQL. Она содержит структуру всех таблиц и текущие данные.
+            {t('backup.createCopyText')}
           </p>
           <button onClick={handleDownload} className="btn-primary w-full justify-center">
-            Скачать бэкап (.sql)
+            {t('backup.downloadBackup')}
           </button>
         </div>
 
@@ -86,10 +88,10 @@ export default function BackupPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-surface-950">Восстановить</h2>
+            <h2 className="text-xl font-semibold text-surface-950">{t('backup.restore')}</h2>
           </div>
           <p className="text-surface-600 mb-4 text-sm">
-            Загрузите файл .sql для восстановления. ВНИМАНИЕ: Текущие данные будут перезаписаны!
+            {t('backup.restoreText')}
           </p>
 
           <form onSubmit={handleUpload}>
@@ -109,7 +111,7 @@ export default function BackupPage() {
               disabled={!file || loading}
               className="btn-secondary w-full justify-center disabled:opacity-50"
             >
-              {loading ? 'Восстановление...' : 'Восстановить базу'}
+              {loading ? t('backup.restoring') : t('backup.restoreDatabase')}
             </button>
           </form>
         </div>

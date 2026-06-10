@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Archive, Bank, Clock, SealCheck, Toolbox, Truck, WarningCircle } from '@phosphor-icons/react';
 import api from '../api/axios';
 import StatusBadge from '../components/StatusBadge';
 import { ContentCard, PageContainer, PageHeader, ScrollArea } from '../components/PageLayout';
 import { StatCard } from '../components/ui';
-
-const statusLabels: Record<string, string> = {
-  AVAILABLE: 'Доступно',
-  IN_USE: 'Используется',
-  REPAIR: 'Ремонт',
-  RESERVED: 'Резерв',
-  WRITTEN_OFF: 'Списано',
-  LOST: 'Потеряно',
-};
+import { formatCompactMoney, formatDate } from '../i18n/format';
 
 const colors = ['var(--success)', 'var(--accent)', 'var(--warning)', 'var(--muted)', 'var(--danger)', 'var(--text-secondary)'];
 const chartTooltipWrapper = { zIndex: 30, outline: 'none', pointerEvents: 'none' as const };
@@ -44,45 +37,42 @@ function ChartTooltip({ active, label, payload }: { active?: boolean; label?: st
   );
 }
 
-function compactMoney(value: number) {
-  return `${Math.round((value || 0) / 1000).toLocaleString('ru-RU')}k ₸`;
-}
-
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     api.get('/dashboard/stats').then((res) => setStats(res.data)).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <PageContainer><ContentCard>Загрузка dashboard...</ContentCard></PageContainer>;
-  if (!stats) return <PageContainer><ContentCard>Нет данных</ContentCard></PageContainer>;
+  if (loading) return <PageContainer><ContentCard>{t('dashboard.loading')}</ContentCard></PageContainer>;
+  if (!stats) return <PageContainer><ContentCard>{t('common.noData')}</ContentCard></PageContainer>;
 
   const cards = [
-    { title: 'Всего оборудования', value: stats.total, icon: Archive, tone: 'slate' as const },
-    { title: 'Доступно', value: stats.available, icon: SealCheck, tone: 'green' as const },
-    { title: 'На ремонте', value: stats.repair, icon: Toolbox, tone: 'violet' as const },
-    { title: 'Просрочено', value: stats.overdueIssuances, icon: Clock, tone: 'red' as const },
-    { title: 'Списано/потеряно', value: stats.writtenOff + stats.lost, icon: WarningCircle, tone: 'red' as const },
-    { title: 'Балансовая стоимость', value: compactMoney(stats.totalValue), icon: Bank, tone: 'blue' as const },
-    { title: 'Остаточная стоимость', value: compactMoney(stats.residualValue), icon: Bank, tone: 'green' as const },
-    { title: 'Ремонт/сервис', value: compactMoney(stats.repairServiceCost), icon: Toolbox, tone: 'violet' as const },
-    { title: 'Передача в ремонт', value: stats.pickupPending + stats.pickupInProgress, icon: Truck, tone: 'violet' as const },
-    { title: 'Доставлено в ремонт', value: stats.pickupDelivered, icon: Truck, tone: 'green' as const },
+    { title: t('dashboard.totalEquipment'), value: stats.total, icon: Archive, tone: 'slate' as const },
+    { title: t('dashboard.available'), value: stats.available, icon: SealCheck, tone: 'green' as const },
+    { title: t('dashboard.inRepair'), value: stats.repair, icon: Toolbox, tone: 'violet' as const },
+    { title: t('dashboard.overdue'), value: stats.overdueIssuances, icon: Clock, tone: 'red' as const },
+    { title: t('dashboard.writtenOffLost'), value: stats.writtenOff + stats.lost, icon: WarningCircle, tone: 'red' as const },
+    { title: t('dashboard.bookValue'), value: formatCompactMoney(stats.totalValue), icon: Bank, tone: 'blue' as const },
+    { title: t('dashboard.residualValue'), value: formatCompactMoney(stats.residualValue), icon: Bank, tone: 'green' as const },
+    { title: t('dashboard.repairService'), value: formatCompactMoney(stats.repairServiceCost), icon: Toolbox, tone: 'violet' as const },
+    { title: t('dashboard.repairPickup'), value: stats.pickupPending + stats.pickupInProgress, icon: Truck, tone: 'violet' as const },
+    { title: t('dashboard.deliveredRepair'), value: stats.pickupDelivered, icon: Truck, tone: 'green' as const },
   ];
 
-  const statusChart = stats.statusStats.map((item: any) => ({ ...item, name: statusLabels[item.status] || item.status }));
+  const statusChart = stats.statusStats.map((item: any) => ({ ...item, name: t(`status.${item.status}`, { defaultValue: item.status }) }));
 
   return (
     <PageContainer className="space-y-6">
       <PageHeader
-        title="Операционный dashboard"
-        description="Баланс, выдачи, ремонты, риски и последние действия в одном месте."
+        title={t('dashboard.title')}
+        description={t('dashboard.description')}
         actions={
         <div className="hidden xl:flex items-center gap-2 text-sm text-surface-500">
           <Toolbox className="h-4 w-4 text-surface-500" weight="regular" />
-          Критичных ремонтов: <b className="text-surface-900">{stats.criticalRepairs}</b>
+          {t('dashboard.criticalRepairs')} <b className="text-surface-900">{stats.criticalRepairs}</b>
         </div>
         }
       />
@@ -98,7 +88,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <ContentCard className="xl:col-span-2">
-          <h2 className="mb-4 text-lg font-extrabold text-surface-950">Выдачи и возвраты за 30 дней</h2>
+          <h2 className="mb-4 text-lg font-extrabold text-surface-950">{t('dashboard.issuancesReturns30')}</h2>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={stats.timeline}>
@@ -106,15 +96,15 @@ export default function DashboardPage() {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{ fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
                 <Tooltip {...chartTooltipProps} content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="issued" name="Выдано" stroke="var(--accent)" fill="color-mix(in srgb, var(--accent) 14%, transparent)" />
-                <Area type="monotone" dataKey="returned" name="Возвращено" stroke="var(--success)" fill="color-mix(in srgb, var(--success) 14%, transparent)" />
+                <Area type="monotone" dataKey="issued" name={t('dashboard.issued')} stroke="var(--accent)" fill="color-mix(in srgb, var(--accent) 14%, transparent)" />
+                <Area type="monotone" dataKey="returned" name={t('dashboard.returned')} stroke="var(--success)" fill="color-mix(in srgb, var(--success) 14%, transparent)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </ContentCard>
 
         <ContentCard>
-          <h2 className="mb-4 text-lg font-extrabold text-surface-950">Статусы</h2>
+          <h2 className="mb-4 text-lg font-extrabold text-surface-950">{t('dashboard.statuses')}</h2>
           <div className="h-64 px-3 pb-2 sm:h-72 sm:px-5">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart margin={{ top: 8, right: 12, bottom: 8, left: 12 }}>
@@ -130,7 +120,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <ContentCard>
-          <h2 className="mb-4 text-lg font-extrabold text-surface-950">Оборудование по категориям</h2>
+          <h2 className="mb-4 text-lg font-extrabold text-surface-950">{t('dashboard.equipmentByCategory')}</h2>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.categoryStats}>
@@ -145,15 +135,15 @@ export default function DashboardPage() {
         </ContentCard>
 
         <ContentCard>
-          <h2 className="mb-4 text-lg font-extrabold text-surface-950">Последние действия</h2>
+          <h2 className="mb-4 text-lg font-extrabold text-surface-950">{t('dashboard.recentActions')}</h2>
           <ScrollArea className="max-h-[340px] space-y-3">
             {stats.recentAudit.map((item: any) => (
               <div key={item.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-surface-200 bg-surface-50 px-3 py-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-surface-900">{item.action}</p>
-                  <p className="truncate text-xs text-surface-500">{item.user?.username || 'system'} · {item.entityType}</p>
+                  <p className="truncate text-xs text-surface-500">{item.user?.username || t('common.system')} · {item.entityType}</p>
                 </div>
-                <span className="text-xs text-surface-400">{new Date(item.createdAt).toLocaleDateString('ru-RU')}</span>
+                <span className="text-xs text-surface-400">{formatDate(item.createdAt)}</span>
               </div>
             ))}
           </ScrollArea>
@@ -161,7 +151,7 @@ export default function DashboardPage() {
       </div>
 
       <ContentCard>
-        <h2 className="mb-4 text-lg font-extrabold text-surface-950">Последние выдачи</h2>
+        <h2 className="mb-4 text-lg font-extrabold text-surface-950">{t('dashboard.recentIssuances')}</h2>
         <ScrollArea className="max-h-[360px]">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {stats.recentIssuances.map((item: any) => (

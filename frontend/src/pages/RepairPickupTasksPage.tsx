@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Truck } from '@phosphor-icons/react';
 import api from '../api/axios';
 import StatusBadge from '../components/StatusBadge';
 import { ContentCard, PageContainer, PageHeader, ScrollArea } from '../components/PageLayout';
 import { EmptyState, ErrorState, StatCard } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
-
-function shortDate(value?: string | null) {
-  return value ? new Date(value).toLocaleDateString('ru-RU') : 'не указано';
-}
+import { formatDate } from '../i18n/format';
 
 function isOverdue(task: any) {
   return task.pickupDueDate && !['DELIVERED', 'CANCELLED'].includes(task.pickupStatus) && new Date(task.pickupDueDate) < new Date();
@@ -16,6 +14,7 @@ function isOverdue(task: any) {
 
 export default function RepairPickupTasksPage() {
   const { user, canManage, isRepairCoordinator } = useAuth();
+  const { t } = useTranslation();
   const [tasks, setTasks] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,13 +29,13 @@ export default function RepairPickupTasksPage() {
 
   useEffect(() => {
     fetchTasks()
-      .catch(() => setError('Не удалось загрузить задачи передачи в ремонт.'))
+      .catch(() => setError(t('repairPickup.loadError')))
       .finally(() => setLoading(false));
   }, []);
 
   const openStatusDialog = (task: any, status: string, title: string) => {
     setStatusDialog({ task, status, title });
-    setStatusComment(status === 'DELIVERED' ? 'Оборудование доставлено в ремонт' : task.pickupComment || '');
+    setStatusComment(status === 'DELIVERED' ? t('repairPickup.deliveredComment') : task.pickupComment || '');
   };
 
   const submitStatusChange = async (event: React.FormEvent) => {
@@ -52,7 +51,7 @@ export default function RepairPickupTasksPage() {
       setStatusComment('');
       await fetchTasks();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Не удалось изменить статус задачи.');
+      setError(err.response?.data?.error || t('repairPickup.saveError'));
     } finally {
       setBusyId(null);
     }
@@ -67,7 +66,7 @@ export default function RepairPickupTasksPage() {
   if (loading) {
     return (
       <PageContainer>
-        <ContentCard>Загрузка задач ремонта...</ContentCard>
+        <ContentCard>{t('repairPickup.loading')}</ContentCard>
       </PageContainer>
     );
   }
@@ -75,8 +74,8 @@ export default function RepairPickupTasksPage() {
   return (
     <PageContainer className="space-y-5">
       <PageHeader
-        title={isRepairCoordinator ? 'Мои задачи ремонта' : 'Передача оборудования в ремонт'}
-        description="Контроль того, кто забирает оборудование, куда его нужно доставить и выполнена ли передача."
+        title={isRepairCoordinator ? t('repairPickup.mineTitle') : t('repairPickup.allTitle')}
+        description={t('repairPickup.description')}
         actions={
           <div className="hidden items-center gap-2 text-sm text-surface-500 md:flex">
             <Truck className="h-4 w-4" weight="regular" />
@@ -88,16 +87,16 @@ export default function RepairPickupTasksPage() {
       {error && <ErrorState message={error} />}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Ожидают" value={pendingCount} tone="slate" />
-        <StatCard title="В работе" value={inProgressCount} tone="violet" />
-        <StatCard title="Доставлено" value={deliveredCount} tone="green" />
-        <StatCard title="Просрочено" value={overdueCount} tone="red" />
+        <StatCard title={t('repairPickup.pending')} value={pendingCount} tone="slate" />
+        <StatCard title={t('repairPickup.inProgress')} value={inProgressCount} tone="violet" />
+        <StatCard title={t('repairPickup.delivered')} value={deliveredCount} tone="green" />
+        <StatCard title={t('repairPickup.overdue')} value={overdueCount} tone="red" />
       </div>
 
       <ContentCard>
         <ScrollArea className="max-h-[70vh]">
           {tasks.length === 0 ? (
-            <EmptyState title="Задач нет" description="Назначьте координатора в ремонтной заявке, и задача появится здесь." />
+            <EmptyState title={t('repairPickup.emptyTitle')} description={t('repairPickup.emptyDescription')} />
           ) : (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {tasks.map((task) => (
@@ -114,20 +113,20 @@ export default function RepairPickupTasksPage() {
 
                   <div className="mt-4 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                     <div className="rounded-md border border-surface-200 bg-surface-200/40 p-3">
-                      <p className="text-xs text-surface-500">Забрать откуда</p>
-                      <p className="font-bold">{task.pickupLocation?.name || task.equipment?.location?.name || 'не указано'}</p>
+                      <p className="text-xs text-surface-500">{t('repairPickup.pickupFrom')}</p>
+                      <p className="font-bold">{task.pickupLocation?.name || task.equipment?.location?.name || t('common.notSpecified')}</p>
                     </div>
                     <div className="rounded-md border border-surface-200 bg-surface-200/40 p-3">
-                      <p className="text-xs text-surface-500">Доставить куда</p>
-                      <p className="font-bold">{task.destinationLocation?.name || 'ремонтная зона'}</p>
+                      <p className="text-xs text-surface-500">{t('repairPickup.deliverTo')}</p>
+                      <p className="font-bold">{task.destinationLocation?.name || t('repairPickup.repairZone')}</p>
                     </div>
                     <div className="rounded-md border border-surface-200 bg-surface-200/40 p-3">
-                      <p className="text-xs text-surface-500">Координатор</p>
-                      <p className="font-bold">{task.assignedCoordinator?.username || 'не назначен'}</p>
+                      <p className="text-xs text-surface-500">{t('repairPickup.coordinator')}</p>
+                      <p className="font-bold">{task.assignedCoordinator?.username || t('common.notAssigned')}</p>
                     </div>
                     <div className={`rounded-md border p-3 ${isOverdue(task) ? 'border-red-200 bg-red-50 text-red-900' : 'border-surface-200 bg-surface-200/40'}`}>
-                      <p className="text-xs opacity-70">Срок передачи</p>
-                      <p className="font-bold">{shortDate(task.pickupDueDate)}</p>
+                      <p className="text-xs opacity-70">{t('repairPickup.dueDate')}</p>
+                      <p className="font-bold">{formatDate(task.pickupDueDate)}</p>
                     </div>
                   </div>
 
@@ -136,18 +135,18 @@ export default function RepairPickupTasksPage() {
                   {canAct(task) && task.pickupStatus !== 'DELIVERED' && task.pickupStatus !== 'CANCELLED' && (
                     <div className="mt-4 flex flex-wrap gap-2">
                       {['PENDING', 'NOTIFIED'].includes(task.pickupStatus) && (
-                        <button className="btn-secondary" disabled={busyId === task.id} onClick={() => openStatusDialog(task, 'IN_PROGRESS', 'Взять задачу в работу')}>
-                          Взять в работу
+                        <button className="btn-secondary" disabled={busyId === task.id} onClick={() => openStatusDialog(task, 'IN_PROGRESS', t('repairPickup.takeWorkTitle'))}>
+                          {t('repairPickup.takeWork')}
                         </button>
                       )}
                       {task.pickupStatus === 'IN_PROGRESS' && (
-                        <button className="btn-secondary" disabled={busyId === task.id} onClick={() => openStatusDialog(task, 'PICKED_UP', 'Подтвердить забор оборудования')}>
-                          Забрал оборудование
+                        <button className="btn-secondary" disabled={busyId === task.id} onClick={() => openStatusDialog(task, 'PICKED_UP', t('repairPickup.pickedUpTitle'))}>
+                          {t('repairPickup.pickedUp')}
                         </button>
                       )}
                       {task.pickupStatus === 'PICKED_UP' && (
-                        <button className="btn-success" disabled={busyId === task.id} onClick={() => openStatusDialog(task, 'DELIVERED', 'Подтвердить доставку в ремонт')}>
-                          Доставил в ремонт
+                        <button className="btn-success" disabled={busyId === task.id} onClick={() => openStatusDialog(task, 'DELIVERED', t('repairPickup.deliveredTitle'))}>
+                          {t('repairPickup.deliveredRepair')}
                         </button>
                       )}
                     </div>
@@ -164,7 +163,7 @@ export default function RepairPickupTasksPage() {
           <form onSubmit={submitStatusChange} className="w-full max-w-lg rounded-lg border border-surface-200 bg-surface-50 p-5 shadow-raised">
             <div className="flex min-w-0 items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="section-title">Смена статуса</p>
+                <p className="section-title">{t('repairPickup.statusChange')}</p>
                 <h2 className="mt-2 text-lg font-extrabold text-surface-950">{statusDialog.title}</h2>
                 <p className="mt-1 truncate font-mono text-xs text-surface-500">{statusDialog.task.equipment?.inventoryNumber}</p>
               </div>
@@ -172,17 +171,17 @@ export default function RepairPickupTasksPage() {
             </div>
 
             <label className="label mt-5" htmlFor="pickup-status-comment">
-              Комментарий к передаче
+              {t('repairPickup.comment')}
             </label>
             <textarea
               id="pickup-status-comment"
               className="input min-h-[112px] resize-y"
-              placeholder="Например: оборудование принято в ремонтной зоне, передано инженеру"
+              placeholder={t('repairPickup.commentPlaceholder')}
               value={statusComment}
               onChange={(event) => setStatusComment(event.target.value)}
             />
             <p className="mt-2 text-xs text-surface-500">
-              Комментарий сохранится в карточке задачи и поможет подтвердить действие на защите.
+              {t('repairPickup.commentHint')}
             </p>
 
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -195,10 +194,10 @@ export default function RepairPickupTasksPage() {
                 }}
                 disabled={busyId === statusDialog.task.id}
               >
-                Отмена
+                {t('common.cancel')}
               </button>
               <button type="submit" className="btn-primary" disabled={busyId === statusDialog.task.id}>
-                {busyId === statusDialog.task.id ? 'Сохранение...' : 'Подтвердить статус'}
+                {busyId === statusDialog.task.id ? t('common.saving') : t('repairPickup.confirmStatus')}
               </button>
             </div>
           </form>
